@@ -592,6 +592,7 @@ def declare_cpython_static_modules(
         copts = [],
         categories = None,
         exclude_modules = [],
+        module_copts = {},
         module_libraries = {},
         visibility = None,
         tags = []):
@@ -605,6 +606,7 @@ def declare_cpython_static_modules(
         copts: C options required by every module. Do not define Py_BUILD_CORE.
         categories: Optional subset of bootstrap, bundled, posix, stdlib, and test.
         exclude_modules: Module names intentionally omitted by the caller.
+        module_copts: Additional compiler flags keyed by module name.
         module_libraries: Existing module-name-to-label mappings to reuse. Entries for modules outside categories are ignored.
         visibility: Visibility for the aggregate and individual module libraries.
         tags: Tags for every generated target.
@@ -707,7 +709,7 @@ def declare_cpython_static_modules(
                 "//conditions:default": [],
             }),
             alwayslink = True,
-            copts = module.copts + copts,
+            copts = module.copts + copts + module_copts.get(module.name, []),
             deps = module_deps,
             includes = module.includes,
             linkopts = module.linkopts,

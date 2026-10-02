@@ -1,8 +1,10 @@
 load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load("@bazel_lib//lib:run_binary.bzl", "run_binary")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@cpython//python/private:build_metadata.bzl", "cpython_build_metadata")
 load("//bazel:extra_frozen_modules.bzl", "EXTRA_FROZEN_MODULES")
+load("//bazel:extra_module_copts.bzl", "EXTRA_MODULE_COPTS")
 load("@cpython//python/private:bundled_libraries.bzl", "bundled_libraries")
 load("@cpython//python/private:deepfreeze.bzl", "deepfreeze_sources")
 load("@cpython//python/private:install_only.bzl", "cpython_install_only")
@@ -29,6 +31,41 @@ package(
 )
 
 declare_cpython_target_config_settings()
+
+# Enable the CPython JIT by default on supported Linux targets.
+# --@python3_15//:cpython_jit=false selects the baseline interpreter.
+bool_flag(
+    name = "cpython_jit",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "cpython_linux_arm64_jit_disabled",
+    constraint_values = ["@platforms//cpu:aarch64", "@platforms//os:linux"],
+    flag_values = {":cpython_jit": "false"},
+)
+
+config_setting(
+    name = "cpython_linux_x86_64_jit_disabled",
+    constraint_values = ["@platforms//cpu:x86_64", "@platforms//os:linux"],
+    flag_values = {":cpython_jit": "false"},
+)
+
+CPYTHON_JIT_DEFINES = select({
+    ":cpython_linux_arm64_jit_disabled": [],
+    ":cpython_linux_x86_64_jit_disabled": [],
+    ":linux_arm64": ["_Py_TIER2=1", "_Py_JIT=1"],
+    ":linux_x86_64": ["_Py_TIER2=1", "_Py_JIT=1"],
+    "//conditions:default": [],
+}) if PYTHON_VERSION == "3.15" else []
+
+CPYTHON_JIT_SOURCES = select({
+    ":cpython_linux_arm64_jit_disabled": [],
+    ":cpython_linux_x86_64_jit_disabled": [],
+    ":linux_arm64": [":cpython_jit_stencils"],
+    ":linux_x86_64": [":cpython_jit_stencils"],
+    "//conditions:default": [],
+}) if PYTHON_VERSION == "3.15" else []
 
 C_STANDARD_COPTS = select({
     ":windows_arm64": ["/std:c11"],
@@ -238,6 +275,7 @@ SYSCONFIG_COMMON_BUILD_VARS = {
 
 cpython_sysconfig(
     name = "generated_sysconfig",
+    extra_nodist_defines = CPYTHON_JIT_DEFINES,
     build_details_schema = CPYTHON_RELEASE.build_details_schema or "",
     build_vars = select({
         ":darwin_arm64": merge_sysconfig_build_vars(SYSCONFIG_COMMON_BUILD_VARS, {
@@ -393,6 +431,7 @@ cc_library(
         "PC/**/*.h",
         "Python/**/*.h",
     ]) + [":pyconfig_h"],
+    defines = CPYTHON_JIT_DEFINES,
     includes = [
         ".",
         "Include",
@@ -436,7 +475,7 @@ cc_library(
         ":windows_x86_64": ["PC"],
         "//conditions:default": [],
     }),
-    defines = select({
+    defines = CPYTHON_JIT_DEFINES + select({
         ":windows_arm64": WINDOWS_BOOTSTRAP_DEFINES,
         ":windows_x86_64": WINDOWS_BOOTSTRAP_DEFINES,
         "//conditions:default": [],
@@ -477,6 +516,55 @@ cc_library(
         "-DPy_BUILD_CORE=1",
     ],
     deps = [":bootstrap_headers"],
+)
+
+# The generator is a host action: it uses an independently built CPython 3.14
+# and the pinned LLVM tools, while compiling stencils for the target platform.
+# Its libc, kernel and compiler headers match those used by the C toolchain.
+genrule(
+    name = "cpython_jit_stencils",
+    srcs = glob([
+        "Include/**",
+        "Python/**/*.h",
+        "Python/**/*.inc",
+        "Tools/jit/**",
+    ], allow_empty = True) + [
+        ":pyconfig_h",
+        "//bazel:jit_extra_headers.json",
+        "@cpython//python/private:cpython_jit.py",
+        "@llvm//runtimes/glibc:glibc_headers_include_search_directory",
+        "@llvm//tools:cpython_jit_builtin_resource_dir",
+        "@llvm//tools:cpython_jit_kernel_headers",
+    ],
+    tools = [
+        "@llvm//tools:clang",
+        "@llvm//tools:llvm-objdump",
+        "@llvm//tools:llvm-readobj",
+        "@python3_14//:python",
+    ],
+    outs = [
+        "cpython_jit/jit_stencils.h",
+        "cpython_jit/jit_stencils_target.h",
+    ],
+    cmd = """        $(location @python3_14//:python) $(location @cpython//python/private:cpython_jit.py) \
+            --script $(location Tools/jit/build.py) \
+            --output $(@D)/cpython_jit \
+            --pyconfig $(location :pyconfig_h) \
+            --tools $$(dirname $(location @llvm//tools:clang)) \
+            --glibc $(location @llvm//runtimes/glibc:glibc_headers_include_search_directory) \
+            --kernel $(location @llvm//tools:cpython_jit_kernel_headers) \
+            --resource $(location @llvm//tools:cpython_jit_builtin_resource_dir) \
+            --extra-headers $(location //bazel:jit_extra_headers.json) \
+            --target """ + select({
+        ":linux_arm64": "aarch64-unknown-linux-gnu",
+        ":linux_x86_64": "x86_64-unknown-linux-gnu",
+        "//conditions:default": "unsupported-target",
+    }),
+    target_compatible_with = select({
+        ":linux_arm64": [],
+        ":linux_x86_64": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )
 
 CORE_BASE_SOURCES = glob([
@@ -631,6 +719,7 @@ BOOTSTRAP_MODULES = declare_cpython_static_modules(
     name = "python_bootstrap_modules",
     version = PYTHON_VERSION,
     module_sources = CPYTHON_MODULE_SOURCES,
+    module_copts = EXTRA_MODULE_COPTS,
     categories = ["bootstrap"],
     copts = RUNTIME_MODULE_COPTS,
     deps = [":headers"],
@@ -640,6 +729,7 @@ STATIC_BOOTSTRAP_MODULES = declare_cpython_static_modules(
     name = "python_static_bootstrap_modules",
     version = PYTHON_VERSION,
     module_sources = CPYTHON_MODULE_SOURCES,
+    module_copts = EXTRA_MODULE_COPTS,
     categories = ["bootstrap"],
     copts = COMMON_COPTS,
     deps = [":bootstrap_headers"],
@@ -653,6 +743,7 @@ STATIC_MODULES = declare_cpython_static_modules(
     name = "python_static_modules",
     version = PYTHON_VERSION,
     module_sources = CPYTHON_MODULE_SOURCES,
+    module_copts = EXTRA_MODULE_COPTS,
     copts = RUNTIME_MODULE_COPTS,
     deps = [":headers"],
     exclude_modules = SHARED_MODULE_NAMES,
@@ -663,6 +754,7 @@ INSTALL_STATIC_MODULES = declare_cpython_static_modules(
     name = "python_install_static_modules",
     version = PYTHON_VERSION,
     module_sources = CPYTHON_MODULE_SOURCES,
+    module_copts = EXTRA_MODULE_COPTS,
     categories = [
         "bootstrap",
         "bundled",
@@ -696,8 +788,9 @@ cc_library(
 
 cc_library(
     name = "python_core_no_frozen",
-    srcs = CORE_SOURCES,
+    srcs = CORE_SOURCES + CPYTHON_JIT_SOURCES,
     copts = CORE_COPTS,
+    includes = ["cpython_jit"],
     deps = [
         ":headers",
         ":python_ceval",
@@ -719,8 +812,9 @@ cc_library(
 
 cc_library(
     name = "python_bootstrap_core_no_frozen",
-    srcs = BOOTSTRAP_CORE_SOURCES,
+    srcs = BOOTSTRAP_CORE_SOURCES + CPYTHON_JIT_SOURCES,
     copts = CORE_COPTS,
+    includes = ["cpython_jit"],
     deps = [
         ":bootstrap_headers",
         ":bootstrap_pyconfig_contract",

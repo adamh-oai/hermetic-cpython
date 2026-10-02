@@ -26,6 +26,11 @@ def _python_impl(module_ctx):
             if module.is_root:
                 root_requested_versions[version] = True
 
+    # CPython 3.15's JIT stencil generator runs with a separate host Python.
+    # Make that interpreter available even when consumers only request 3.15.
+    if "3.15" in requested_versions:
+        requested_versions["3.14"] = True
+
     if requested_versions:
         http_archive(
             name = "cpython_libffi",

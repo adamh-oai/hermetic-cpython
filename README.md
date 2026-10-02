@@ -75,6 +75,13 @@ module name and source path. For example,
 `{"Python/frozen_modules/example.h":["example","Lib/example.py"]}`.
 The default is an empty object. Pass the JSON as a single shell argument.
 
+On Linux x86-64 and AArch64 the 3.15 build enables the experimental JIT. Set
+`--@python3_15//:cpython_jit=false` to disable it. Custom source trees may set
+`CPYTHON_3_15_JIT_EXTRA_HEADERS` to a JSON array of header names to include in
+generated stencils, and `CPYTHON_3_15_MODULE_COPTS` to a JSON object mapping
+module names to additional compiler-flag arrays. Pass both as Bazel
+`--repo_env` values; the defaults are empty.
+
 The LLVM toolchains build each selected CPython release for Linux, macOS, and
 Windows on arm64 and x86_64. Windows targets use the MSVC ABI, the hermetic MSVC
 runtime, and the hermetic Windows SDK supplied by `windows_support`.

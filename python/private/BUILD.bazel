@@ -16,6 +16,7 @@ exports_files([
     "pyconfig_contract.c",
     "repositories.bzl",
     "shared_extensions.bzl",
+    "cpython_jit.py",
     "test_programs.bzl",
     "upstream_test.sh",
     "upstream_tests.bzl",

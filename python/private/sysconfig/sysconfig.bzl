@@ -73,6 +73,12 @@ def _cpython_sysconfig_impl(ctx):
     if ctx.attr.platform not in ["darwin", "linux", "windows"]:
         fail("unsupported CPython sysconfig platform: {}".format(ctx.attr.platform))
 
+    build_vars_dict = dict(ctx.attr.build_vars)
+    if ctx.attr.extra_nodist_defines:
+        flags = " ".join(["-D" + define for define in ctx.attr.extra_nodist_defines])
+        for name in ["CFLAGS_NODIST", "PY_CFLAGS_NODIST"]:
+            build_vars_dict[name] = " ".join([build_vars_dict.get(name, ""), flags]).strip()
+
     forbidden_runtime_vars = [
         "base",
         "installed_base",
@@ -82,17 +88,17 @@ def _cpython_sysconfig_impl(ctx):
     ]
     integer_build_vars = {name: True for name in ctx.attr.integer_build_vars}
     for name in integer_build_vars:
-        if name not in ctx.attr.build_vars:
+        if name not in build_vars_dict:
             fail("integer_build_vars contains unknown build variable {}".format(name))
 
-    for name in sorted(ctx.attr.build_vars.keys()):
+    for name in sorted(build_vars_dict.keys()):
         if name.startswith("HAVE_") or name.startswith("WITH_"):
             fail("{} must come from pyconfig.h, not build_vars".format(name))
         if name in forbidden_runtime_vars:
             fail("{} is computed by sysconfig at runtime".format(name))
         if "\t" in name or "\n" in name:
             fail("invalid sysconfig variable name: {}".format(name))
-        value = ctx.attr.build_vars[name]
+        value = build_vars_dict[name]
         if "\n" in value:
             fail("sysconfig variable {} contains a newline".format(name))
 
@@ -103,9 +109,9 @@ def _cpython_sysconfig_impl(ctx):
             "{}\t{}\t{}\n".format(
                 "I" if name in integer_build_vars else "S",
                 name,
-                ctx.attr.build_vars[name],
+                build_vars_dict[name],
             )
-            for name in sorted(ctx.attr.build_vars.keys())
+            for name in sorted(build_vars_dict.keys())
         ]),
     )
 
@@ -152,17 +158,17 @@ def _cpython_sysconfig_impl(ctx):
                 _build_details_json(
                     ctx,
                     base_prefix = "../..",
-                    base_interpreter = "./bin/python{}".format(ctx.attr.build_vars["VERSION"]),
-                    headers = "./include/python{}".format(ctx.attr.build_vars["VERSION"]),
+                    base_interpreter = "./bin/python{}".format(build_vars_dict["VERSION"]),
+                    headers = "./include/python{}".format(build_vars_dict["VERSION"]),
                 ),
             )
             ctx.actions.write(
                 runtime_build_details,
                 _build_details_json(
                     ctx,
-                    base_prefix = ctx.attr.build_vars["prefix"],
-                    base_interpreter = "{}/python{}".format(ctx.attr.build_vars["BINDIR"], ctx.attr.build_vars["VERSION"]),
-                    headers = ctx.attr.build_vars["INCLUDEPY"],
+                    base_prefix = build_vars_dict["prefix"],
+                    base_interpreter = "{}/python{}".format(build_vars_dict["BINDIR"], build_vars_dict["VERSION"]),
+                    headers = build_vars_dict["INCLUDEPY"],
                 ),
             )
             outputs.append(sysconfig_json)
@@ -194,6 +200,7 @@ cpython_sysconfig = rule(
     attrs = {
         "build_details_schema": attr.string(),
         "build_vars": attr.string_dict(mandatory = True),
+        "extra_nodist_defines": attr.string_list(),
         "cache_tag": attr.string(mandatory = True),
         "hexversion": attr.int(mandatory = True),
         "integer_build_vars": attr.string_list(),

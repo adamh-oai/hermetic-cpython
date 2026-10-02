@@ -427,6 +427,20 @@ def _cpython_source_repository_impl(repository_ctx):
                 len(recipe) != 2 or type(recipe[0]) != "string" or type(recipe[1]) != "string"):
                 fail("invalid extra frozen module recipe: {}".format(repr(output)))
     repository_ctx.file("bazel/extra_frozen_modules.bzl", "EXTRA_FROZEN_MODULES = {}\n".format(repr(extra_frozen)))
+    extra_headers = []
+    extra_copts = {}
+    if repository_ctx.attr.minor_version == "3.15":
+        extra_headers = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_JIT_EXTRA_HEADERS", "[]"))
+        extra_copts = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_MODULE_COPTS", "{}"))
+        if type(extra_headers) != "list" or any([type(header) != "string" for header in extra_headers]):
+            fail("CPYTHON_3_15_JIT_EXTRA_HEADERS must be a JSON array of strings")
+        if type(extra_copts) != "dict":
+            fail("CPYTHON_3_15_MODULE_COPTS must be a JSON object")
+        for module, flags in extra_copts.items():
+            if type(module) != "string" or type(flags) != "list" or any([type(flag) != "string" for flag in flags]):
+                fail("invalid additional module compiler options for {}".format(repr(module)))
+    repository_ctx.file("bazel/jit_extra_headers.json", json.encode(extra_headers))
+    repository_ctx.file("bazel/extra_module_copts.bzl", "EXTRA_MODULE_COPTS = {}\n".format(repr(extra_copts)))
     release = repository_ctx.attr.release
     release_level = repository_ctx.attr.release_level
     micro = repository_ctx.attr.micro
@@ -502,12 +516,17 @@ def _cpython_source_repository_impl(repository_ctx):
     )
     repository_ctx.file(
         "bazel/BUILD.bazel",
-        "exports_files([\"module_sources.bzl\", \"release.bzl\", \"extra_frozen_modules.bzl\"])\n",
+        "exports_files([\"module_sources.bzl\", \"release.bzl\", \"extra_frozen_modules.bzl\", \"extra_module_copts.bzl\", \"jit_extra_headers.json\"])\n",
     )
 
 cpython_source_repository = repository_rule(
     implementation = _cpython_source_repository_impl,
-    environ = ["CPYTHON_3_15_SOURCE_ARCHIVE", "CPYTHON_3_15_EXTRA_FROZEN_MODULES"],
+    environ = [
+        "CPYTHON_3_15_SOURCE_ARCHIVE",
+        "CPYTHON_3_15_EXTRA_FROZEN_MODULES",
+        "CPYTHON_3_15_JIT_EXTRA_HEADERS",
+        "CPYTHON_3_15_MODULE_COPTS",
+    ],
     attrs = {
         "build_details_schema": attr.string(),
         "build_file": attr.label(

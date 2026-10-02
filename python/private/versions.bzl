@@ -63,10 +63,10 @@ def _cpython_release(
         serial = serial,
         sha256 = sha256,
         soabi = cache_tag,
-        strip_prefix = ("cpython-{}" if minor_version == "3.15" else "Python-{}").format(source_version),
+        strip_prefix = ("cpython-{}" if minor_version in ["3.14", "3.15"] else "Python-{}").format(source_version),
         urls = ([
             "https://github.com/python/cpython/archive/refs/tags/v{}.tar.gz".format(source_version),
-        ] if minor_version == "3.15" else [
+        ] if minor_version in ["3.14", "3.15"] else [
             "https://www.python.org/ftp/python/{release}/Python-{release}.tar.xz".format(
                 release = release,
             ),
@@ -183,7 +183,7 @@ CPYTHON_RELEASES = _validate_releases({
     "3.14": _cpython_release(
         release = "3.14.5",
         repository_name = "python3_14",
-        sha256 = "7e32597b99e5d9a39abed35de4693fa169df3e5850d4c334337ffd6a19a36db6",
+        sha256 = "6b9ee05e36ea9f477e3d49d1feb49598eb0907dc588259c8b25d6a485ee25e11",
         patches = _COMMON_PATCHES,
         needs_deepfreeze = False,
         venv_launcher_kind = "dedicated",

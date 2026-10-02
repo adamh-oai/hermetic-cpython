@@ -1402,9 +1402,33 @@ def pyconfig(name, version, windows_pyconfig_template = False):
         "//:linux_x86_64": _linux_policy_checks(version),
     })
 
+    jit_checks = []
+    template = "pyconfig.h.in"
+    if version == "3.15":
+        # CPython's configure normally passes these as private compiler flags.
+        # Also put them in the exported header so that external clients using
+        # internal headers see the same layout as the interpreter.
+        enabled = [checks.AC_DEFINE("_Py_JIT", 1), checks.AC_DEFINE("_Py_TIER2", 1)]
+        disabled = [checks.AC_FAIL("_Py_JIT"), checks.AC_FAIL("_Py_TIER2")]
+        jit_checks = select({
+            "//:cpython_linux_arm64_jit_disabled": disabled,
+            "//:cpython_linux_x86_64_jit_disabled": disabled,
+            "//:linux_arm64": enabled,
+            "//:linux_x86_64": enabled,
+            "//conditions:default": disabled,
+        })
+        native.genrule(
+            name = name + "_jit_template",
+            srcs = ["pyconfig.h.in"],
+            outs = ["cpython_pyconfig/pyconfig.h.in"],
+            cmd = "cat $(location pyconfig.h.in) > $@; printf '\n%s\n' '#ifndef _Py_JIT' '#undef _Py_JIT' '#endif' '#ifndef _Py_TIER2' '#undef _Py_TIER2' '#endif' >> $@",
+            tags = ["manual"],
+        )
+        template = ":" + name + "_jit_template"
+
     autoconf(
         name = name + "_checks",
-        checks = common_checks + target_policy_checks,
+        checks = common_checks + target_policy_checks + jit_checks,
         tags = ["manual"],
     )
 
@@ -1413,7 +1437,7 @@ def pyconfig(name, version, windows_pyconfig_template = False):
         out = "pyconfig.h",
         deps = [":" + name + "_checks"],
         tags = ["manual"],
-        template = "pyconfig.h.in",
+        template = template,
     )
 
     native.filegroup(
