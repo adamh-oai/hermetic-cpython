@@ -72,6 +72,18 @@ _RESOURCE_ONLY_MODULES = {
         "test_xpickle",
         "test_zipfile64",
     ],
+    "3.15": [
+        "test_curses",
+        "test_peg_generator",
+        "test_pyrepl",
+        "test_smtpnet",
+        "test_socketserver",
+        "test_urllib2net",
+        "test_urllibnet",
+        "test_winsound",
+        "test_xpickle",
+        "test_zipfile64",
+    ],
 }
 
 def _test_module_for_source(source):

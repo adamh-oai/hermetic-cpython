@@ -2,6 +2,7 @@ load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load("@bazel_lib//lib:run_binary.bzl", "run_binary")
 load("@cpython//python/private:build_metadata.bzl", "cpython_build_metadata")
+load("//bazel:extra_frozen_modules.bzl", "EXTRA_FROZEN_MODULES")
 load("@cpython//python/private:bundled_libraries.bzl", "bundled_libraries")
 load("@cpython//python/private:deepfreeze.bzl", "deepfreeze_sources")
 load("@cpython//python/private:install_only.bzl", "cpython_install_only")
@@ -389,7 +390,7 @@ cc_library(
         "Include",
         "Include/internal",
         "Modules",
-    ] + (["Include/internal/mimalloc"] if PYTHON_VERSION in ["3.13", "3.14"] else []) + select({
+    ] + (["Include/internal/mimalloc"] if PYTHON_VERSION in ["3.13", "3.14", "3.15"] else []) + select({
         ":windows_arm64": ["PC"],
         ":windows_x86_64": ["PC"],
         "//conditions:default": [],
@@ -401,6 +402,7 @@ cc_library(
             "Modules/_ssl/*.c",
             "Objects/*.inc",
             "Objects/mimalloc/**/*.c",
+            "Python/**/*.inc",
         ],
         allow_empty = True,
     ),
@@ -421,7 +423,7 @@ cc_library(
         "Include",
         "Include/internal",
         "Modules",
-    ] + (["Include/internal/mimalloc"] if PYTHON_VERSION in ["3.13", "3.14"] else []) + select({
+    ] + (["Include/internal/mimalloc"] if PYTHON_VERSION in ["3.13", "3.14", "3.15"] else []) + select({
         ":windows_arm64": ["PC"],
         ":windows_x86_64": ["PC"],
         "//conditions:default": [],
@@ -438,6 +440,7 @@ cc_library(
             "Modules/_ssl/*.c",
             "Objects/*.inc",
             "Objects/mimalloc/**/*.c",
+            "Python/**/*.inc",
         ],
         allow_empty = True,
     ),
@@ -592,7 +595,7 @@ COMMON_COPTS = C_STANDARD_COPTS + OPTIMIZATION_COPTS + [
     ],
 })
 
-WINDOWS_REMOTE_DEBUG_COPTS = ["-DPy_REMOTE_DEBUG=1"] if PYTHON_VERSION == "3.14" else []
+WINDOWS_REMOTE_DEBUG_COPTS = ["-DPy_REMOTE_DEBUG=1"] if PYTHON_VERSION in ["3.14", "3.15"] else []
 
 CORE_COPTS = ["-DPy_BUILD_CORE=1"] + COMMON_COPTS + select({
     ":windows_arm64": [
@@ -608,7 +611,7 @@ CORE_COPTS = ["-DPy_BUILD_CORE=1"] + COMMON_COPTS + select({
     "//conditions:default": [],
 })
 
-CEVAL_COPTS = ["-finline-max-stacksize=512"] if PYTHON_VERSION == "3.14" else []
+CEVAL_COPTS = ["-finline-max-stacksize=512"] if PYTHON_VERSION in ["3.14", "3.15"] else []
 
 RUNTIME_MODULE_COPTS = COMMON_COPTS + select({
     ":windows_arm64": ["-DPy_BUILD_CORE=1"],
@@ -635,7 +638,7 @@ STATIC_BOOTSTRAP_MODULES = declare_cpython_static_modules(
 )
 
 SHARED_MODULE_NAMES = ["_testcapi"] + (
-    ["_asyncio"] if PYTHON_VERSION == "3.14" else []
+    ["_asyncio"] if PYTHON_VERSION in ["3.14", "3.15"] else []
 )
 
 STATIC_MODULES = declare_cpython_static_modules(
@@ -722,7 +725,7 @@ cc_test(
     name = "libffi_complex_test",
     srcs = ["@cpython//python/private/libffi:complex_test.c"],
     deps = ["@cpython_libffi//:libffi"],
-    tags = [] if PYTHON_VERSION == "3.14" else ["manual"],
+    tags = [] if PYTHON_VERSION in ["3.14", "3.15"] else ["manual"],
     target_compatible_with = select({
         ":windows_arm64": ["@platforms//:incompatible"],
         ":windows_x86_64": ["@platforms//:incompatible"],
@@ -734,21 +737,21 @@ cc_test(
     name = "libffi_call_test",
     srcs = ["@cpython//python/private/libffi:call_test.c"],
     deps = ["@cpython_libffi//:libffi"],
-    tags = [] if PYTHON_VERSION == "3.14" else ["manual"],
+    tags = [] if PYTHON_VERSION in ["3.14", "3.15"] else ["manual"],
 )
 
 cc_test(
     name = "libffi_closure_test",
     srcs = ["@cpython//python/private/libffi:closure_test.c"],
     deps = ["@cpython_libffi//:libffi"],
-    tags = [] if PYTHON_VERSION == "3.14" else ["manual"],
+    tags = [] if PYTHON_VERSION in ["3.14", "3.15"] else ["manual"],
 )
 
 cc_test(
     name = "libffi_seh_test",
     srcs = ["@cpython//python/private/libffi:seh_test.c"],
     deps = ["@cpython_libffi//:libffi"],
-    tags = [] if PYTHON_VERSION == "3.14" else ["manual"],
+    tags = [] if PYTHON_VERSION in ["3.14", "3.15"] else ["manual"],
     target_compatible_with = select({
         ":windows_arm64": [],
         ":windows_x86_64": [],
@@ -808,7 +811,7 @@ FROZEN_MODULES = {
     "Python/frozen_modules/site.h": ("site", "Lib/site.py"),
     "Python/frozen_modules/stat.h": ("stat", "Lib/stat.py"),
     "Python/frozen_modules/zipimport.h": ("zipimport", "Lib/zipimport.py"),
-}
+} | EXTRA_FROZEN_MODULES
 
 [
     run_binary(

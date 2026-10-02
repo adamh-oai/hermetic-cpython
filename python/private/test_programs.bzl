@@ -27,6 +27,12 @@ _TEST_PROGRAMS = {
             "Programs/test_frozenmain.h",
         ],
     },
+    "3.15": {
+        "Programs/_testembed": [
+            "Programs/_testembed.c",
+            "Programs/test_frozenmain.h",
+        ],
+    },
 }
 
 def native_test_programs(version, deps, linkopts = [], local_defines = []):

@@ -58,6 +58,23 @@ The supported CPython minor versions are 3.11, 3.12, 3.13, and 3.14. Each
 list the corresponding generated repository in `use_repo` before referring to
 it from a label.
 
+## Experimental CPython 3.15 source builds
+
+Version `3.15` builds a pinned 3.15.0a5 release by default. It also accepts a
+user-provided source snapshot. Select it with `python.version(version = "3.15")`
+and set
+`--repo_env=CPYTHON_3_15_SOURCE_ARCHIVE=/absolute/path/to/source.tar.gz`.
+The archive must have the CPython source files at its root. The build checks
+the source's major and minor version and derives its full release metadata
+from `Include/patchlevel.h`.
+
+Custom source trees can request additional frozen modules using
+`--repo_env=CPYTHON_3_15_EXTRA_FROZEN_MODULES=<json>`, where the JSON object maps
+an output path under `Python/frozen_modules/` to a two-element array of the
+module name and source path. For example,
+`{"Python/frozen_modules/example.h":["example","Lib/example.py"]}`.
+The default is an empty object. Pass the JSON as a single shell argument.
+
 The LLVM toolchains build each selected CPython release for Linux, macOS, and
 Windows on arm64 and x86_64. Windows targets use the MSVC ABI, the hermetic MSVC
 runtime, and the hermetic Windows SDK supplied by `windows_support`.

@@ -101,6 +101,7 @@ _STDLIB_COMMON = [
             "3.12": ["MODULE__CTYPES_MALLOC_CLOSURE"],
             "3.13": ["MODULE__CTYPES_MALLOC_CLOSURE"],
             "3.14": ["MODULE__CTYPES_MALLOC_CLOSURE"],
+            "3.15": ["MODULE__CTYPES_MALLOC_CLOSURE"],
         },
     ),
     _module("_heapq", "stdlib"),
@@ -356,14 +357,14 @@ def _test_3_13_14():
 
 def _bootstrap_modules(version):
     modules = _BOOTSTRAP_PREFIX
-    if version in ["3.13", "3.14"]:
+    if version in ["3.13", "3.14", "3.15"]:
         modules = modules + [_module("_suggestions", "bootstrap")]
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         modules = modules + [_module("_datetime", "bootstrap")]
     modules = modules + _BOOTSTRAP_IMPORT
-    if version in ["3.13", "3.14"]:
+    if version in ["3.13", "3.14", "3.15"]:
         modules = modules + [_module("_sysconfig", "bootstrap")]
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         modules = modules + [
             _module("_types", "bootstrap"),
             _module("_opcode", "bootstrap"),
@@ -409,11 +410,12 @@ def _version_modules(version):
             _WINDOWS_COMMON +
             _test_3_13_14()
         )
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         return (
             _bootstrap_modules(version) +
             _STDLIB_COMMON +
             _STDLIB_3_14 +
+            ([_module("_math_integer", "stdlib")] if version == "3.15" else []) +
             _BUNDLED_BASE +
             _BUNDLED_3_14 +
             _POSIX_COMMON +

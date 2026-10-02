@@ -209,7 +209,7 @@ def bundled_libraries(
         _hacl_library("bundled_hacl_sha2", "SHA2", visibility)
         _hacl_library("bundled_hacl_sha3", "SHA3", visibility)
 
-    if version in ["3.14", "3.14.5"]:
+    if version in ["3.14", "3.14.5", "3.15", "3.15.0"]:
         cc_library(
             name = "bundled_hacl_blake2",
             srcs = [
@@ -255,7 +255,7 @@ def bundled_libraries(
             visibility = visibility,
         )
 
-    if version not in ["3.14", "3.14.5"]:
+    if version not in ["3.14", "3.14.5", "3.15", "3.15.0"]:
         cc_library(
             name = "bundled_blake2",
             hdrs = _BLAKE2_HEADERS,

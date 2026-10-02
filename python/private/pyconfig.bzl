@@ -446,7 +446,7 @@ def _common_fixed_defines(version):
         checks.AC_DEFINE("__BSD_VISIBLE", 1),
         checks.AC_DEFINE("__EXTENSIONS__", 1),
     ]
-    if version in ["3.12", "3.13", "3.14"]:
+    if version in ["3.12", "3.13", "3.14", "3.15"]:
         defines += [
             checks.AC_DEFINE("_HPUX_ALT_XOPEN_SOCKET_API", 1),
             checks.AC_DEFINE("_OPENBSD_SOURCE", 1),
@@ -470,7 +470,7 @@ def _common_fixed_defines(version):
             checks.AC_FAIL("__STDC_WANT_LIB_EXT2__"),
             checks.AC_FAIL("__STDC_WANT_MATH_SPEC_FUNCS__"),
         ]
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         defines += [
             checks.AC_DEFINE("Py_REMOTE_DEBUG", 1),
             checks.AC_DEFINE("_Py_FFI_SUPPORT_C_COMPLEX", 1),
@@ -501,7 +501,7 @@ def _dynamic_loading_checks(version, linkopts):
             if_false = None,
         ),
     ]
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         checks_list += [
             _declared_function_check(
                 "dladdr",
@@ -634,7 +634,14 @@ def _dependent_header_checks(version):
             includes = socket_prerequisites,
             compile_defines = _SYSTEM_EXTENSION_DEFINES + ["HAVE_SYS_SOCKET_H"],
         ))
-    if version in ["3.13", "3.14"]:
+    if version == "3.15":
+        checks_list.append(_header_check(
+            "linux/can/isotp.h",
+            "HAVE_LINUX_CAN_ISOTP_H",
+            includes = socket_prerequisites,
+            compile_defines = _SYSTEM_EXTENSION_DEFINES + ["HAVE_SYS_SOCKET_H"],
+        ))
+    if version in ["3.13", "3.14", "3.15"]:
         checks_list.append(_header_check(
             "netlink/netlink.h",
             "HAVE_NETLINK_NETLINK_H",
@@ -688,7 +695,7 @@ def _pty_checks(header, login_header, linkopts):
     ]
 
 def _thread_name_checks(version, linkopts):
-    if version != "3.14":
+    if version not in ["3.14", "3.15"]:
         return []
     return [
         _declared_function_check(
@@ -819,14 +826,14 @@ def _special_function_checks(version):
             requires = ["HAVE_SYS_RANDOM_H"],
         ),
     ]
-    if version in ["3.13", "3.14"]:
+    if version in ["3.13", "3.14", "3.15"]:
         checks_list.append(_declared_function_check(
             "timerfd_create",
             "HAVE_TIMERFD_CREATE",
             ["#include <sys/timerfd.h>"],
             requires = ["HAVE_SYS_TIMERFD_H"],
         ))
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         checks_list.append(_declared_function_check(
             "backtrace",
             "HAVE_BACKTRACE",
@@ -852,7 +859,7 @@ def _declaration_checks(version):
         if_true = 1,
         if_false = 0,
     )
-    if version in ["3.13", "3.14"]:
+    if version in ["3.13", "3.14", "3.15"]:
         checks_list += macros.AC_CHECK_DECLS(
             ["UT_NAMESIZE"],
             includes = ["#include <utmp.h>"],
@@ -1124,7 +1131,7 @@ def _capability_checks(version):
             requires = ["HAVE_SYS_SYSCALL_H", "HAVE_LINUX_RANDOM_H"],
         ),
     ]
-    if version in ["3.13", "3.14"]:
+    if version in ["3.13", "3.14", "3.15"]:
         checks_list.append(checks.AC_DEFINE(
             "HAVE___UINT128_T",
             condition = "HAVE_GCC_UINT128_T",
@@ -1237,7 +1244,44 @@ def _darwin_policy_checks(version, support_tier):
         checks.AC_DEFINE("PY_SUPPORT_TIER", support_tier),
         checks.AC_DEFINE("THREAD_STACK_SIZE", "0x1000000"),
         checks.AC_DEFINE("WITH_DYLD", 1),
-    ] + ([checks.AC_DEFINE("HAVE_STDARG_PROTOTYPES", 1)] if version == "3.11" else []) + ([checks.AC_DEFINE("_PYTHREAD_NAME_MAXLEN", 63)] if version == "3.14" else []) + _dynamic_loading_checks(version, []) + _posix_shmem_checks([]) + _pty_checks("util.h", "util.h", []) + _thread_name_checks(version, []) + _darwin_filesystem_checks() + _darwin_library_checks()
+    ] + ([checks.AC_DEFINE("HAVE_STDARG_PROTOTYPES", 1)] if version == "3.11" else []) + ([checks.AC_DEFINE("_PYTHREAD_NAME_MAXLEN", 63)] if version in ["3.14", "3.15"] else []) + _dynamic_loading_checks(version, []) + _posix_shmem_checks([]) + _pty_checks("util.h", "util.h", []) + _thread_name_checks(version, []) + _darwin_filesystem_checks() + _darwin_library_checks()
+
+def _linux_315_checks():
+    # Match the checks for new 3.15 interfaces in configure.ac. Checking the
+    # individual statx members keeps builds compatible with older libc headers.
+    checks_list = macros.AC_CHECK_FUNCS(
+        ["statx"],
+        compile_defines = _SYSTEM_EXTENSION_DEFINES,
+    )
+    for member in [
+        "stx_mnt_id",
+        "stx_dio_mem_align",
+        "stx_subvol",
+        "stx_atomic_write_unit_min",
+        "stx_dio_read_offset_align",
+        "stx_atomic_write_unit_max_opt",
+    ]:
+        checks_list.append(checks.AC_CHECK_MEMBER(
+            "struct statx." + member,
+            define = "HAVE_STRUCT_STATX_" + member.upper(),
+            includes = ["#include <sys/stat.h>"],
+            compile_defines = _SYSTEM_EXTENSION_DEFINES,
+            requires = ["HAVE_STATX"],
+        ))
+    checks_list += macros.AC_CHECK_DECLS(
+        ["PR_SET_VMA_ANON_NAME"],
+        includes = ["#include <linux/prctl.h>", "#include <sys/prctl.h>"],
+        compile_defines = _SYSTEM_EXTENSION_DEFINES,
+        if_true = 1,
+        if_false = 0,
+    )
+    checks_list.append(checks.AC_DEFINE(
+        "HAVE_PR_SET_VMA_ANON_NAME",
+        condition = "HAVE_DECL_PR_SET_VMA_ANON_NAME",
+        if_true = 1,
+        if_false = None,
+    ))
+    return checks_list
 
 def _linux_policy_checks(version):
     return [
@@ -1248,7 +1292,7 @@ def _linux_policy_checks(version):
         checks.AC_DEFINE("_POSIX_C_SOURCE", "200809L"),
         checks.AC_DEFINE("_XOPEN_SOURCE", 700),
         checks.AC_DEFINE("_XOPEN_SOURCE_EXTENDED", 1),
-    ] + ([checks.AC_DEFINE("HAVE_STDARG_PROTOTYPES", 1)] if version == "3.11" else []) + ([checks.AC_DEFINE("_PYTHREAD_NAME_MAXLEN", 15)] if version == "3.14" else []) + _dynamic_loading_checks(version, ["-ldl"]) + _posix_shmem_checks(["-lrt"]) + _pty_checks("pty.h", "utmp.h", ["-lutil"]) + _thread_name_checks(version, ["-lpthread"]) + _linux_filesystem_checks() + _linux_library_checks()
+    ] + ([checks.AC_DEFINE("HAVE_STDARG_PROTOTYPES", 1)] if version == "3.11" else []) + ([checks.AC_DEFINE("_PYTHREAD_NAME_MAXLEN", 15)] if version in ["3.14", "3.15"] else []) + _dynamic_loading_checks(version, ["-ldl"]) + _posix_shmem_checks(["-lrt"]) + _pty_checks("pty.h", "utmp.h", ["-lutil"]) + _thread_name_checks(version, ["-lpthread"]) + _linux_filesystem_checks() + _linux_library_checks() + (_linux_315_checks() if version == "3.15" else [])
 
 def pyconfig(name, version, windows_pyconfig_template = False):
     """Generates pyconfig.h with checks executed by the selected C toolchain.
@@ -1311,10 +1355,12 @@ def pyconfig(name, version, windows_pyconfig_template = False):
     headers = _HEADERS + (_HEADERS_3_11_12 if version in ["3.11", "3.12"] else _HEADERS_3_13)
     if version == "3.11":
         headers += _HEADERS_3_11
-    elif version == "3.14":
+    elif version in ["3.14", "3.15"]:
         headers += _HEADERS_3_14
 
-    functions = _FUNCTIONS + (_FUNCTIONS_3_13 if version in ["3.13", "3.14"] else [])
+    functions = _FUNCTIONS + (_FUNCTIONS_3_13 if version in ["3.13", "3.14", "3.15"] else [])
+    if version == "3.15":
+        functions += ["clearenv", "ppoll"]
     if version == "3.11":
         functions.append("ttyname")
     version_checks = []
@@ -1328,13 +1374,17 @@ def pyconfig(name, version, windows_pyconfig_template = False):
             ),
             checks.AC_DEFINE("PY_FORMAT_SIZE_T", '"z"'),
         ]
-    elif version in ["3.13", "3.14"]:
+    elif version in ["3.13", "3.14", "3.15"]:
         version_checks.append(checks.AC_DEFINE(
             "WITH_MIMALLOC",
             condition = "HAVE_STD_ATOMIC",
             if_true = 1,
             if_false = None,
         ))
+
+    # Use the standard interpreter unless tail-call dispatch is enabled.
+    if version == "3.15":
+        version_checks.append(checks.AC_DEFINE("_Py_TAIL_CALL_INTERP", 0))
 
     common_checks = _common_fixed_defines(version) + size_checks + type_checks + _compiler_checks() + macros.AC_CHECK_HEADERS(
         headers,
@@ -1344,7 +1394,7 @@ def pyconfig(name, version, windows_pyconfig_template = False):
         compile_defines = _SYSTEM_EXTENSION_DEFINES,
     ) + _required_math_checks() + _capability_checks(version) + version_checks
     target_policy_checks = select({
-        "//:darwin_arm64": _darwin_policy_checks(version, 1 if version in ["3.13", "3.14"] else 2),
+        "//:darwin_arm64": _darwin_policy_checks(version, 1 if version in ["3.13", "3.14", "3.15"] else 2),
         "//:darwin_x86_64": _darwin_policy_checks(version, 1),
         "//:linux_arm64": _linux_policy_checks(version),
         "//:linux_x86_64": _linux_policy_checks(version),

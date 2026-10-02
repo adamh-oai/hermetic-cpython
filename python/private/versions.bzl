@@ -36,6 +36,8 @@ def _cpython_release(
     micro = int(version_parts[2])
     minor_version = "{}.{}".format(major, minor)
     cache_tag = "cpython-{}{}".format(major, minor)
+    release_suffix = {"alpha": "a", "beta": "b", "candidate": "rc", "final": ""}[release_level]
+    source_version = release + (release_suffix + str(serial) if release_suffix else "")
     release_level_code = _RELEASE_LEVEL_CODES[release_level]
     redirect_venv_launcher = venv_launcher_kind == "redirect"
     return struct(
@@ -61,12 +63,14 @@ def _cpython_release(
         serial = serial,
         sha256 = sha256,
         soabi = cache_tag,
-        strip_prefix = "Python-{}".format(release),
-        urls = [
+        strip_prefix = ("cpython-{}" if minor_version == "3.15" else "Python-{}").format(source_version),
+        urls = ([
+            "https://github.com/python/cpython/archive/refs/tags/v{}.tar.gz".format(source_version),
+        ] if minor_version == "3.15" else [
             "https://www.python.org/ftp/python/{release}/Python-{release}.tar.xz".format(
                 release = release,
             ),
-        ],
+        ]),
         supports_isolated_interpreters = supports_isolated_interpreters,
         venv_launcher_kind = venv_launcher_kind,
         venv_launcher_runtime_name = "python" if redirect_venv_launcher else "venvlauncher",
@@ -111,6 +115,19 @@ def _validate_releases(releases):
     return releases
 
 CPYTHON_RELEASES = _validate_releases({
+    "3.15": _cpython_release(
+        release = "3.15.0",
+        repository_name = "python3_15",
+        sha256 = "98b7bdf23d3f978e007d6c50f458d152d717ba2b295d3318bdb692e139a51257",
+        patches = [],
+        needs_deepfreeze = False,
+        venv_launcher_kind = "dedicated",
+        windows_pyconfig_template = False,
+        build_details_schema = "1.0",
+        supports_isolated_interpreters = True,
+        release_level = "alpha",
+        serial = 5,
+    ),
     "3.11": _cpython_release(
         release = "3.11.15",
         repository_name = "python3_11",

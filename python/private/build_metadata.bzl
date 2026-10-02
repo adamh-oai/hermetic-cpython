@@ -4,7 +4,7 @@ load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 
 def cpython_build_metadata(version):
     """Defines CPython 3.14 runtime build metadata targets."""
-    if version != "3.14":
+    if version not in ["3.14", "3.15"]:
         return struct(install_data = [], runtime_data = [], test_data = [])
 
     posix_target_compatible_with = select({

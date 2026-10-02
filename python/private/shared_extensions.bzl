@@ -47,6 +47,7 @@ _COMMON_EXTENSIONS = {
             "3.12": ["MODULE__CTYPES_MALLOC_CLOSURE"],
             "3.13": ["MODULE__CTYPES_MALLOC_CLOSURE"],
             "3.14": ["MODULE__CTYPES_MALLOC_CLOSURE"],
+            "3.15": ["MODULE__CTYPES_MALLOC_CLOSURE"],
         },
         "windows_linkopts": [
             "/EXPORT:DllGetClassObject,PRIVATE",
@@ -143,6 +144,12 @@ _VERSION_EXTENSIONS = {
         "_testsinglephase": {
             "core_module": True,
         },
+        "_wmi": _WMI_EXTENSION,
+    },
+    "3.15": {
+        "_testcapi": {"core_module": True},
+        "_testclinic_limited": _TESTCLINIC_LIMITED_EXTENSION,
+        "_testsinglephase": {"core_module": True},
         "_wmi": _WMI_EXTENSION,
     },
 }
@@ -280,7 +287,7 @@ def shared_extensions(
 
     extensions = dict(_COMMON_EXTENSIONS)
     extensions.update(_VERSION_EXTENSIONS[version])
-    if version == "3.14":
+    if version in ["3.14", "3.15"]:
         extensions["_asyncio"] = {
             "core_module": True,
         }

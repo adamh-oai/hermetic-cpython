@@ -327,6 +327,14 @@ def _validate_release(repository_ctx):
         "PY_RELEASE_SERIAL": str(repository_ctx.attr.serial),
         "PY_VERSION": repr(repository_ctx.attr.release),
     }
+    # A source snapshot may move between 3.15 development revisions. Verify
+    # the minor version here and derive the full patchlevel below instead of
+    # claiming that every snapshot is the same alpha release.
+    if repository_ctx.attr.minor_version == "3.15":
+        expected_defines = {
+            "PY_MAJOR_VERSION": "3",
+            "PY_MINOR_VERSION": "15",
+        }
     for name, expected in expected_defines.items():
         actual = _patchlevel_define(patchlevel_h, name)
         if actual != expected:
@@ -377,11 +385,21 @@ def _validate_release(repository_ctx):
         fail("dedicated venv launcher source does not define EXENAME and use pathcch.h")
 
 def _cpython_source_repository_impl(repository_ctx):
-    repository_ctx.download_and_extract(
-        url = repository_ctx.attr.urls,
-        sha256 = repository_ctx.attr.sha256,
-        stripPrefix = repository_ctx.attr.strip_prefix,
-    )
+    archive = ""
+    if repository_ctx.attr.minor_version == "3.15":
+        archive = repository_ctx.os.environ.get("CPYTHON_3_15_SOURCE_ARCHIVE", "")
+    if archive:
+        if not archive.startswith("/"):
+            fail("Set CPYTHON_3_15_SOURCE_ARCHIVE to the absolute path of a CPython source tar.gz")
+        archive_path = repository_ctx.path(archive)
+        repository_ctx.watch(archive_path)
+        repository_ctx.extract(archive_path)
+    else:
+        repository_ctx.download_and_extract(
+            url = repository_ctx.attr.urls,
+            sha256 = repository_ctx.attr.sha256,
+            stripPrefix = repository_ctx.attr.strip_prefix,
+        )
     repository_ctx.download_and_extract(
         url = _RUNTIME_TZDATA_URL,
         output = "Lib",
@@ -398,6 +416,40 @@ def _cpython_source_repository_impl(repository_ctx):
     repository_ctx.symlink(repository_ctx.attr.build_file, "BUILD.bazel")
     repository_ctx.file("Modules/Setup.local", "")
     repository_ctx.file("pybuilddir.txt", ".")
+    extra_frozen = {}
+    if repository_ctx.attr.minor_version == "3.15":
+        extra_frozen = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_EXTRA_FROZEN_MODULES", "{}"))
+        if type(extra_frozen) != "dict":
+            fail("CPYTHON_3_15_EXTRA_FROZEN_MODULES must be a JSON object")
+        for output, recipe in extra_frozen.items():
+            if (type(output) != "string" or not output.startswith("Python/frozen_modules/") or
+                not output.endswith(".h") or ".." in output or type(recipe) != "list" or
+                len(recipe) != 2 or type(recipe[0]) != "string" or type(recipe[1]) != "string"):
+                fail("invalid extra frozen module recipe: {}".format(repr(output)))
+    repository_ctx.file("bazel/extra_frozen_modules.bzl", "EXTRA_FROZEN_MODULES = {}\n".format(repr(extra_frozen)))
+    release = repository_ctx.attr.release
+    release_level = repository_ctx.attr.release_level
+    micro = repository_ctx.attr.micro
+    serial = repository_ctx.attr.serial
+    hexversion = repository_ctx.attr.hexversion
+    resource_field3 = repository_ctx.attr.resource_field3
+    if repository_ctx.attr.minor_version == "3.15":
+        patchlevel = repository_ctx.read("Include/patchlevel.h")
+        micro = int(_patchlevel_define(patchlevel, "PY_MICRO_VERSION"))
+        serial = int(_patchlevel_define(patchlevel, "PY_RELEASE_SERIAL"))
+        raw_release = _patchlevel_define(patchlevel, "PY_VERSION")
+        if not (raw_release.startswith('"') and raw_release.endswith('"')):
+            fail("Include/patchlevel.h has an invalid PY_VERSION")
+        release = raw_release[1:-1]
+        level_define = _patchlevel_define(patchlevel, "PY_RELEASE_LEVEL")
+        levels = {value: name for name, value in _RELEASE_LEVEL_DEFINES.items()}
+        if level_define not in levels:
+            fail("Unsupported CPython release level {}".format(level_define))
+        release_level = levels[level_define]
+        level_code = {"alpha": 0xA, "beta": 0xB, "candidate": 0xC, "final": 0xF}[release_level]
+        hexversion = (3 * 0x1000000 + 15 * 0x10000 + micro * 0x100 + level_code * 0x10 + serial)
+        resource_field3 = micro * 1000 + level_code * 10 + serial
+
     repository_ctx.file(
         "bazel/release.bzl",
         (
@@ -429,16 +481,16 @@ def _cpython_source_repository_impl(repository_ctx):
         ).format(
             build_details_schema = repr(repository_ctx.attr.build_details_schema or None),
             cache_tag = repr(repository_ctx.attr.cache_tag),
-            hexversion = repository_ctx.attr.hexversion,
+            hexversion = hexversion,
             major = repository_ctx.attr.major,
-            micro = repository_ctx.attr.micro,
+            micro = micro,
             minor = repository_ctx.attr.minor,
             minor_version = repr(repository_ctx.attr.minor_version),
             needs_deepfreeze = repr(repository_ctx.attr.needs_deepfreeze),
-            release = repr(repository_ctx.attr.release),
-            release_level = repr(repository_ctx.attr.release_level),
-            resource_field3 = repository_ctx.attr.resource_field3,
-            serial = repository_ctx.attr.serial,
+            release = repr(release),
+            release_level = repr(release_level),
+            resource_field3 = resource_field3,
+            serial = serial,
             soabi = repr(repository_ctx.attr.soabi),
             supports_isolated_interpreters = repr(repository_ctx.attr.supports_isolated_interpreters),
             venv_launcher_kind = repr(repository_ctx.attr.venv_launcher_kind),
@@ -450,11 +502,12 @@ def _cpython_source_repository_impl(repository_ctx):
     )
     repository_ctx.file(
         "bazel/BUILD.bazel",
-        "exports_files([\"module_sources.bzl\", \"release.bzl\"])\n",
+        "exports_files([\"module_sources.bzl\", \"release.bzl\", \"extra_frozen_modules.bzl\"])\n",
     )
 
 cpython_source_repository = repository_rule(
     implementation = _cpython_source_repository_impl,
+    environ = ["CPYTHON_3_15_SOURCE_ARCHIVE", "CPYTHON_3_15_EXTRA_FROZEN_MODULES"],
     attrs = {
         "build_details_schema": attr.string(),
         "build_file": attr.label(
