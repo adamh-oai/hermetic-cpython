@@ -28,7 +28,7 @@ def _extension_replacements(extensions, destination):
         for extension in extensions
     }
 
-def _posix_replacements(version, extensions):
+def _posix_replacements(version, extensions, shared_suffix):
     stdlib = "lib/python{}".format(version)
     replacements = {
         "Include": "include/python{}".format(version),
@@ -39,6 +39,7 @@ def _posix_replacements(version, extensions):
         "_sysconfig_vars": stdlib + "/_sysconfig_vars",
         "install_metadata/build-details.json": stdlib + "/build-details.json",
         "install_runtime/python": "bin/python{}".format(version),
+        "install_runtime/libpython{}.{}".format(version, shared_suffix): "lib/libpython{}.{}".format(version, shared_suffix),
     }
     replacements.update(_extension_replacements(extensions, stdlib + "/lib-dynload"))
     return replacements
@@ -108,24 +109,28 @@ def cpython_install_tree(
         srcs = common_sources + install_metadata + select({
             ":darwin_arm64": [
                 python,
+                ":python_install_posix_shared",
                 sysconfig_data,
                 "LICENSE",
                 ":_install_tree_posix_marker",
             ] + _extension_labels(extensions.install_only_darwin_arm64),
             ":darwin_x86_64": [
                 python,
+                ":python_install_posix_shared",
                 sysconfig_data,
                 "LICENSE",
                 ":_install_tree_posix_marker",
             ] + _extension_labels(extensions.install_only_darwin_x86_64),
             ":linux_arm64": [
                 python,
+                ":python_install_posix_shared",
                 sysconfig_data,
                 "LICENSE",
                 ":_install_tree_posix_marker",
             ] + _extension_labels(extensions.install_only_linux_arm64),
             ":linux_x86_64": [
                 python,
+                ":python_install_posix_shared",
                 sysconfig_data,
                 "LICENSE",
                 ":_install_tree_posix_marker",
@@ -147,10 +152,10 @@ def cpython_install_tree(
         hardlink = "off",
         include_external_repositories = ["*msvc_runtime*"],
         replace_prefixes = select({
-            ":darwin_arm64": _posix_replacements(version, extensions.install_only_darwin_arm64),
-            ":darwin_x86_64": _posix_replacements(version, extensions.install_only_darwin_x86_64),
-            ":linux_arm64": _posix_replacements(version, extensions.install_only_linux_arm64),
-            ":linux_x86_64": _posix_replacements(version, extensions.install_only_linux_x86_64),
+            ":darwin_arm64": _posix_replacements(version, extensions.install_only_darwin_arm64, "dylib"),
+            ":darwin_x86_64": _posix_replacements(version, extensions.install_only_darwin_x86_64, "dylib"),
+            ":linux_arm64": _posix_replacements(version, extensions.install_only_linux_arm64, "so"),
+            ":linux_x86_64": _posix_replacements(version, extensions.install_only_linux_x86_64, "so"),
             ":windows_arm64": _windows_replacements(version, extensions.install_only_windows),
             ":windows_x86_64": _windows_replacements(version, extensions.install_only_windows),
         }),

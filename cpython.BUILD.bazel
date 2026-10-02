@@ -241,6 +241,8 @@ cpython_sysconfig(
     build_details_schema = CPYTHON_RELEASE.build_details_schema or "",
     build_vars = select({
         ":darwin_arm64": merge_sysconfig_build_vars(SYSCONFIG_COMMON_BUILD_VARS, {
+            "LDLIBRARY": "libpython{}.dylib".format(PYTHON_VERSION),
+            "INSTSONAME": "libpython{}.dylib".format(PYTHON_VERSION),
             "BLDSHARED": "clang -shared",
             "EXT_SUFFIX": ".{}-darwin.so".format(PYTHON_SOABI),
             "LIBM": "-lm",
@@ -254,6 +256,8 @@ cpython_sysconfig(
             "SOABI": "{}-darwin".format(PYTHON_SOABI),
         }),
         ":darwin_x86_64": merge_sysconfig_build_vars(SYSCONFIG_COMMON_BUILD_VARS, {
+            "LDLIBRARY": "libpython{}.dylib".format(PYTHON_VERSION),
+            "INSTSONAME": "libpython{}.dylib".format(PYTHON_VERSION),
             "BLDSHARED": "clang -shared",
             "EXT_SUFFIX": ".{}-darwin.so".format(PYTHON_SOABI),
             "LIBM": "-lm",
@@ -267,6 +271,8 @@ cpython_sysconfig(
             "SOABI": "{}-darwin".format(PYTHON_SOABI),
         }),
         ":linux_arm64": merge_sysconfig_build_vars(SYSCONFIG_COMMON_BUILD_VARS, {
+            "LDLIBRARY": "libpython{}.so".format(PYTHON_VERSION),
+            "INSTSONAME": "libpython{}.so".format(PYTHON_VERSION),
             "BLDSHARED": "clang -shared",
             "EXT_SUFFIX": ".{}-aarch64-linux-gnu.so".format(PYTHON_SOABI),
             "LIBM": "-lm",
@@ -279,6 +285,8 @@ cpython_sysconfig(
             "SOABI": "{}-aarch64-linux-gnu".format(PYTHON_SOABI),
         }),
         ":linux_x86_64": merge_sysconfig_build_vars(SYSCONFIG_COMMON_BUILD_VARS, {
+            "LDLIBRARY": "libpython{}.so".format(PYTHON_VERSION),
+            "INSTSONAME": "libpython{}.so".format(PYTHON_VERSION),
             "BLDSHARED": "clang -shared",
             "EXT_SUFFIX": ".{}-x86_64-linux-gnu.so".format(PYTHON_SOABI),
             "LIBM": "-lm",
@@ -909,6 +917,77 @@ cc_library(
     visibility = ["//visibility:private"],
 )
 
+# Bazel adds runfiles rpaths, while these paths also work when a runtime or
+# install tree is moved away from Bazel's output directory.
+PYTHON_ADJACENT_RPATH = select({
+    ":darwin_arm64": ["-Wl,-rpath,@loader_path"],
+    ":darwin_x86_64": ["-Wl,-rpath,@loader_path"],
+    ":linux_arm64": ["-Wl,-rpath,$$ORIGIN"],
+    ":linux_x86_64": ["-Wl,-rpath,$$ORIGIN"],
+    "//conditions:default": [],
+})
+PYTHON_INSTALL_RPATH = select({
+    ":darwin_arm64": ["-Wl,-rpath,@loader_path/../lib"],
+    ":darwin_x86_64": ["-Wl,-rpath,@loader_path/../lib"],
+    ":linux_arm64": ["-Wl,-rpath,$$ORIGIN/../lib"],
+    ":linux_x86_64": ["-Wl,-rpath,$$ORIGIN/../lib"],
+    "//conditions:default": [],
+})
+
+# Keep the POSIX interpreter and native clients on the same shared CPython
+# instance. The library lives beside runtime/python and keeps a stable soname.
+PYTHON_POSIX_SHARED_NAME = select({
+    ":darwin_arm64": "libpython{}.dylib".format(PYTHON_VERSION),
+    ":darwin_x86_64": "libpython{}.dylib".format(PYTHON_VERSION),
+    "//conditions:default": "libpython{}.so".format(PYTHON_VERSION),
+})
+
+PYTHON_POSIX_SHARED_LINKOPTS = PLATFORM_LINKOPTS + select({
+    ":darwin_arm64": ["-Wl,-install_name,@rpath/libpython{}.dylib".format(PYTHON_VERSION)],
+    ":darwin_x86_64": ["-Wl,-install_name,@rpath/libpython{}.dylib".format(PYTHON_VERSION)],
+    ":linux_arm64": ["-Wl,-soname,libpython{}.so".format(PYTHON_VERSION)],
+    ":linux_x86_64": ["-Wl,-soname,libpython{}.so".format(PYTHON_VERSION)],
+    "//conditions:default": [],
+})
+
+cc_shared_library(
+    name = "python_posix_shared",
+    deps = [
+        ":python_core_no_frozen",
+        ":python_frozen",
+        STATIC_MODULES.library,
+    ],
+    shared_lib_name = "runtime/" + PYTHON_POSIX_SHARED_NAME,
+    target_compatible_with = POSIX_TARGET_COMPATIBILITY,
+    user_link_flags = PYTHON_POSIX_SHARED_LINKOPTS,
+)
+
+cc_import(
+    name = "python_posix_shared_import",
+    shared_library = ":python_posix_shared",
+    target_compatible_with = POSIX_TARGET_COMPATIBILITY,
+)
+
+cc_shared_library(
+    name = "python_install_posix_shared",
+    deps = [
+        ":python_core_no_frozen",
+        ":python_frozen",
+        INSTALL_STATIC_MODULES.library,
+    ],
+    shared_lib_name = "install_runtime/" + PYTHON_POSIX_SHARED_NAME,
+    target_compatible_with = POSIX_TARGET_COMPATIBILITY,
+    user_link_flags = PYTHON_POSIX_SHARED_LINKOPTS,
+    visibility = ["//visibility:private"],
+)
+
+cc_import(
+    name = "python_install_posix_shared_import",
+    shared_library = ":python_install_posix_shared",
+    target_compatible_with = POSIX_TARGET_COMPATIBILITY,
+    visibility = ["//visibility:private"],
+)
+
 cc_shared_library(
     name = "python_dll",
     deps = [
@@ -1183,8 +1262,7 @@ NATIVE_TEST_PROGRAMS = native_test_programs(
         ],
         "//conditions:default": [
             ":headers",
-            ":python_frozen",
-            ":python_runtime_core",
+            ":python_posix_shared_import",
         ],
     }),
     linkopts = PLATFORM_LINKOPTS + select({
@@ -1304,8 +1382,7 @@ PYTHON_RUNTIME_DEPS = select({
     ],
     "//conditions:default": [
         ":headers",
-        ":python_frozen",
-        ":python_runtime_core",
+        ":python_posix_shared_import",
     ],
 })
 
@@ -1324,7 +1401,7 @@ cc_binary(
     copts = CORE_COPTS,
     data = PYTHON_RUNTIME_DATA + BUILD_METADATA.runtime_data,
     deps = PYTHON_RUNTIME_DEPS,
-    linkopts = PYTHON_LINKOPTS + select({
+    linkopts = PYTHON_LINKOPTS + PYTHON_ADJACENT_RPATH + select({
         ":windows_arm64": [
             "/NODEFAULTLIB:" + PYTHON_IMPORT_LIBRARY,
             "$(location :python_exe_resource)",
@@ -1357,11 +1434,10 @@ cc_binary(
         ],
         "//conditions:default": [
             ":headers",
-            ":python_frozen",
-            ":python_install_runtime_core",
+            ":python_install_posix_shared_import",
         ],
     }),
-    linkopts = PYTHON_LINKOPTS + select({
+    linkopts = PYTHON_LINKOPTS + PYTHON_INSTALL_RPATH + select({
         ":windows_arm64": [
             "/NODEFAULTLIB:" + PYTHON_IMPORT_LIBRARY,
             "$(location :python_exe_resource)",

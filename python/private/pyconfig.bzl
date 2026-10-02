@@ -1234,6 +1234,7 @@ def _member_checks():
 
 def _darwin_policy_checks(version, support_tier):
     return [
+        checks.AC_DEFINE("Py_ENABLE_SHARED", 1),
         checks.AC_FAIL("_POSIX_C_SOURCE"),
         checks.AC_FAIL("_XOPEN_SOURCE"),
         checks.AC_FAIL("_XOPEN_SOURCE_EXTENDED"),
@@ -1285,6 +1286,7 @@ def _linux_315_checks():
 
 def _linux_policy_checks(version):
     return [
+        checks.AC_DEFINE("Py_ENABLE_SHARED", 1),
         checks.AC_DEFINE("HAVE_DEV_PTMX", 1),
         checks.AC_DEFINE("HAVE_WORKING_TZSET", 1),
         checks.AC_DEFINE("PTHREAD_SYSTEM_SCHED_SUPPORTED", 1),
