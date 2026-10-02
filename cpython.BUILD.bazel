@@ -518,9 +518,29 @@ cc_library(
     deps = [":bootstrap_headers"],
 )
 
-# The generator is a host action: it uses an independently built CPython 3.14
-# and the pinned LLVM tools, while compiling stencils for the target platform.
-# Its libc, kernel and compiler headers match those used by the C toolchain.
+# These aliases are used as genrule tools, so their selects match the execution
+# platform even when the Python interpreter targets a different architecture.
+[
+    alias(
+        name = "cpython_jit_llvm_" + name,
+        actual = select({
+            "@llvm//platforms/config:linux_x86_64": "@cpython_jit_llvm_linux_amd64//:" + target,
+            "@llvm//platforms/config:linux_aarch64": "@cpython_jit_llvm_linux_arm64//:" + target,
+        }),
+        tags = ["manual"],
+    )
+    for name, target in {
+        "clang": "bin/clang",
+        "multicall": "bin/llvm",
+        "objdump": "bin/llvm-objdump",
+        "readobj": "bin/llvm-readobj",
+        "resource_dir": "builtin_resource_dir",
+    }.items()
+]
+
+# The generator uses a host CPython 3.14 and LLVM 21 to compile stencils for
+# the target platform. Its libc and kernel headers match the C toolchain;
+# its Clang resource headers come from the same LLVM 21 distribution.
 genrule(
     name = "cpython_jit_stencils",
     srcs = glob([
@@ -533,13 +553,14 @@ genrule(
         "//bazel:jit_extra_headers.json",
         "@cpython//python/private:cpython_jit.py",
         "@llvm//runtimes/glibc:glibc_headers_include_search_directory",
-        "@llvm//tools:cpython_jit_builtin_resource_dir",
         "@llvm//tools:cpython_jit_kernel_headers",
     ],
     tools = [
-        "@llvm//tools:clang",
-        "@llvm//tools:llvm-objdump",
-        "@llvm//tools:llvm-readobj",
+        ":cpython_jit_llvm_clang",
+        ":cpython_jit_llvm_multicall",
+        ":cpython_jit_llvm_objdump",
+        ":cpython_jit_llvm_readobj",
+        ":cpython_jit_llvm_resource_dir",
         "@python3_14//:python",
     ],
     outs = [
@@ -550,10 +571,10 @@ genrule(
             --script $(location Tools/jit/build.py) \
             --output $(@D)/cpython_jit \
             --pyconfig $(location :pyconfig_h) \
-            --tools $$(dirname $(location @llvm//tools:clang)) \
+            --tools $$(dirname $(location :cpython_jit_llvm_clang)) \
             --glibc $(location @llvm//runtimes/glibc:glibc_headers_include_search_directory) \
             --kernel $(location @llvm//tools:cpython_jit_kernel_headers) \
-            --resource $(location @llvm//tools:cpython_jit_builtin_resource_dir) \
+            --resource $(location :cpython_jit_llvm_resource_dir) \
             --extra-headers $(location //bazel:jit_extra_headers.json) \
             --target """ + select({
         ":linux_arm64": "aarch64-unknown-linux-gnu",

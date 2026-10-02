@@ -1,0 +1,17 @@
+load("@llvm//:directory.bzl", "headers_directory")
+
+package(default_visibility = ["//visibility:public"])
+
+# The executable names are symlinks to the LLVM multicall binary. Callers
+# must declare both the symlink and bin/llvm as inputs to the action.
+exports_files([
+    "bin/clang",
+    "bin/llvm",
+    "bin/llvm-objdump",
+    "bin/llvm-readobj",
+])
+
+headers_directory(
+    name = "builtin_resource_dir",
+    path = "lib/clang/21",
+)

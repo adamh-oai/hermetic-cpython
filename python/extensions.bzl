@@ -6,6 +6,14 @@ load("//python/private:versions.bzl", "CPYTHON_RELEASES")
 
 _BUILD_FILE = Label("//:cpython.BUILD.bazel")
 _LIBFFI_BUILD_FILE = Label("//:libffi.BUILD.bazel")
+_JIT_LLVM_BUILD_FILE = Label("//python/private:jit_llvm.BUILD.bazel")
+
+# CPython 3.15's JIT generator requires LLVM 21. These are host tools for
+# generating stencils, independent of the LLVM toolchain that builds Python.
+_JIT_LLVM_ARCHIVES = {
+    "linux_amd64": "76ea940cfe14859b78e6175ebae9176a92f3b4e3a5a5e3f4488d2a0853f01cd0",
+    "linux_arm64": "ac70f0b0f448e7d6e36784877f8df533beb91e7ea7a61fc724e09a962adfb101",
+}
 
 def _python_impl(module_ctx):
     requested_versions = {}
@@ -32,6 +40,17 @@ def _python_impl(module_ctx):
         requested_versions["3.14"] = True
 
     if requested_versions:
+        # Declare both repositories alongside the Python repositories so their
+        # labels resolve even when a consumer selects an older Python version.
+        # Bazel only downloads the archive used by a JIT build.
+        for platform, sha256 in _JIT_LLVM_ARCHIVES.items():
+            http_archive(
+                name = "cpython_jit_llvm_" + platform,
+                build_file = _JIT_LLVM_BUILD_FILE,
+                sha256 = sha256,
+                urls = ["https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-21.1.8-10/llvm-toolchain-minimal-21.1.8-{}-musl.tar.zst".format(platform.replace("_", "-"))],
+            )
+
         http_archive(
             name = "cpython_libffi",
             build_file = _LIBFFI_BUILD_FILE,

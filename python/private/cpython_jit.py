@@ -57,7 +57,7 @@ sys.argv = [
     str(script), args.target,
     "--output-dir", str(output),
     "--pyconfig-dir", str(args.pyconfig.resolve().parent),
-    "--llvm-version", "22",
+    "--llvm-version", "21",
     "--cflags", shlex.join(cflags),
 ]
 runpy.run_path(str(script), run_name="__main__")
