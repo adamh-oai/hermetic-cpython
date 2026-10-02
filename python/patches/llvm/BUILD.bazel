@@ -1,5 +1,6 @@
 exports_files([
     "jit-headers.patch",
+    "pgo.patch",
     "msvc-runtime-features.patch",
     "msvc-warning-level.patch",
 ])

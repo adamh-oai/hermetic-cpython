@@ -1,0 +1,114 @@
+diff --git a/3rd_party/llvm-project/x.x/compiler-rt/compiler-rt.BUILD.bazel b/3rd_party/llvm-project/x.x/compiler-rt/compiler-rt.BUILD.bazel
+--- a/3rd_party/llvm-project/x.x/compiler-rt/compiler-rt.BUILD.bazel
++++ b/3rd_party/llvm-project/x.x/compiler-rt/compiler-rt.BUILD.bazel
+@@ -11,6 +11,43 @@
+ load("@llvm//toolchain/runtimes:cc_unsanitized_library.bzl", "cc_unsanitized_library")
+ load("@llvm-project//:vars.bzl", "LLVM_VERSION_MAJOR")
+ load("@rules_cc//cc:cc_library.bzl", "cc_library")
++
++# The profile runtime must itself be built without instrumentation.
++# The stage-0 wrapper clears user compile/link flags for compiler runtimes.
++cc_library(
++    name = "profile_runtime",
++    srcs = [
++        "lib/profile/GCDAProfiling.c",
++        "lib/profile/InstrProfiling.c",
++        "lib/profile/InstrProfilingInternal.c",
++        "lib/profile/InstrProfilingBuffer.c",
++        "lib/profile/InstrProfilingMerge.c",
++        "lib/profile/InstrProfilingMergeFile.c",
++        "lib/profile/InstrProfilingNameVar.c",
++        "lib/profile/InstrProfilingVersionVar.c",
++        "lib/profile/InstrProfilingWriter.c",
++        "lib/profile/InstrProfilingPlatformLinux.c",
++        "lib/profile/InstrProfilingFile.c",
++        "lib/profile/InstrProfilingRuntime.cpp",
++        "lib/profile/InstrProfilingUtil.c",
++        "lib/profile/InstrProfilingValue.c",
++    ] + glob(["lib/profile/*.h", "include/profile/*.h", "include/profile/*.inc"]),
++    includes = ["include", "lib/profile"],
++    local_defines = [
++        "COMPILER_RT_HAS_ATOMICS=1",
++        "COMPILER_RT_HAS_FCNTL_LCK=1",
++        "COMPILER_RT_HAS_FLOCK=1",
++        "COMPILER_RT_HAS_UNAME=1",
++    ],
++    implementation_deps = ["@kernel_headers", "@glibc//:gnu_libc_headers"],
++    target_compatible_with = ["@platforms//os:linux"],
++)
++
++cc_runtime_stage0_static_library(
++    name = "clang_rt.profile.static",
++    visibility = ["//visibility:public"],
++    deps = [":profile_runtime"],
++)
+ 
+ ###
+ ### compiler-rt/lib/builtins/CMakeLists.txt.
+diff --git a/runtimes/compiler-rt/BUILD.bazel b/runtimes/compiler-rt/BUILD.bazel
+--- a/runtimes/compiler-rt/BUILD.bazel
++++ b/runtimes/compiler-rt/BUILD.bazel
+@@ -13,6 +13,12 @@
+ alias(
+     name = "clang_rt.fuzzer_interceptors.static",
+     actual = "@compiler-rt//:clang_rt.fuzzer_interceptors.static",
++    visibility = ["//visibility:public"],
++)
++
++alias(
++    name = "clang_rt.profile.static",
++    actual = "@compiler-rt//:clang_rt.profile.static",
+     visibility = ["//visibility:public"],
+ )
+ 
+diff --git a/runtimes/BUILD.bazel b/runtimes/BUILD.bazel
+--- a/runtimes/BUILD.bazel
++++ b/runtimes/BUILD.bazel
+@@ -189,6 +189,11 @@
+     srcs = {
+         "//runtimes/compiler-rt:clang_rt.builtins.static": "libclang_rt.builtins",
+     } | select({
++        "@platforms//os:linux": {
++            "//runtimes/compiler-rt:clang_rt.profile.static": "libclang_rt.profile",
++        },
++        "//conditions:default": {},
++    }) | select({
+         "//config:fuzzer_enabled": {
+             "//runtimes/compiler-rt:clang_rt.fuzzer.static": "libclang_rt.fuzzer",
+             "//runtimes/compiler-rt:clang_rt.fuzzer_no_main.static": "libclang_rt.fuzzer_no_main",
+diff --git a/toolchain/features/BUILD.bazel b/toolchain/features/BUILD.bazel
+--- a/toolchain/features/BUILD.bazel
++++ b/toolchain/features/BUILD.bazel
+@@ -11,6 +11,21 @@
+ # [] dynamic_linking_mode
+ # [] per_object_debug_info
+ # [x] static_link_cpp_runtimes
++
++# Bazel supplies fdo_profile_path as a declared input to compilation actions.
++cc_feature(
++    name = "fdo_optimize",
++    args = [":fdo_optimize_compile_args"],
++    overrides = "@rules_cc//cc/toolchains/features/legacy:fdo_optimize",
++)
++
++cc_args(
++    name = "fdo_optimize_compile_args",
++    actions = ["@rules_cc//cc/toolchains/actions:compile_actions"],
++    args = ["-fprofile-instr-use={fdo_profile_path}"],
++    format = {"fdo_profile_path": "@rules_cc//cc/toolchains/variables:fdo_profile_path"},
++    requires_not_none = "@rules_cc//cc/toolchains/variables:fdo_profile_path",
++)
+ 
+ cc_feature(
+     name = "static_link_cpp_runtimes",
+diff --git a/toolchain/cc_toolchain.bzl b/toolchain/cc_toolchain.bzl
+--- a/toolchain/cc_toolchain.bzl
++++ b/toolchain/cc_toolchain.bzl
+@@ -10,6 +10,7 @@
+             "@llvm//toolchain/features:static_link_cpp_runtimes",
+             "@llvm//toolchain/features:archive_param_file",
+             "@llvm//toolchain/features:parse_headers",
++            "@llvm//toolchain/features:fdo_optimize",
+         ] + select({
+             "@llvm//constraints/windows/abi:msvc": [
+                 "@llvm//toolchain/features:targets_windows",

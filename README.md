@@ -82,6 +82,28 @@ generated stencils, and `CPYTHON_3_15_MODULE_COPTS` to a JSON object mapping
 module names to additional compiler-flag arrays. Pass both as Bazel
 `--repo_env` values; the defaults are empty.
 
+The JIT generator runs using a separate host CPython 3.14. Selecting 3.15
+automatically creates the 3.14 repository for this internal dependency; it
+does not need a separate `use_repo` entry.
+
+### Using the fork as a dependency
+
+Bzlmod applies module overrides only from the root module. When using this
+fork from another workspace, copy the `python/patches` directory from the
+same fork revision into the root workspace and copy the `single_version_override`
+and `archive_override` declarations from this fork's `MODULE.bazel` into the
+root `MODULE.bazel`. The patch labels in those declarations refer to the
+copied files. In particular, the pinned LLVM override and its JIT and PGO
+patches are required for the corresponding features. Add a root
+`bazel_dep(name = "llvm", version = "0.8.8")` and configure the toolchain
+with `--extra_toolchains=@llvm//toolchain:all`; the remaining local toolchain
+settings can be copied from this repository's `.bazelrc`.
+
+On POSIX platforms the runtime includes a shared libpython next to the Python
+executable. On Linux the pinned LLVM toolchain also supplies the profiling
+runtime and accepts Bazel's `--fdo_optimize` for an LLVM profile; producing
+the training profile and choosing a workload are the consumer's responsibility.
+
 The LLVM toolchains build each selected CPython release for Linux, macOS, and
 Windows on arm64 and x86_64. Windows targets use the MSVC ABI, the hermetic MSVC
 runtime, and the hermetic Windows SDK supplied by `windows_support`.
