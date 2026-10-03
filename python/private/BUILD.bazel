@@ -17,6 +17,7 @@ exports_files([
     "repositories.bzl",
     "shared_extensions.bzl",
     "cpython_jit.py",
+    "cpython_jit_test.sh",
     "jit_llvm.BUILD.bazel",
     "test_programs.bzl",
     "upstream_test.sh",

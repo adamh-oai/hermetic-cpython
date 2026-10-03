@@ -83,8 +83,9 @@ module names to additional compiler-flag arrays. Pass both as Bazel
 `--repo_env` values; the defaults are empty.
 
 The JIT generator runs using a separate host CPython 3.14 and pinned LLVM
-21.1.8 tools and Clang headers. The interpreter itself uses the pinned LLVM
-22 toolchain. JIT builds require a Linux x86-64 or AArch64 execution host;
+22.1.4 tools and Clang headers. The interpreter itself uses the pinned LLVM
+22 toolchain. The upstream generator warns that LLVM versions other than 21
+are unsupported. JIT builds require a Linux x86-64 or AArch64 execution host;
 the generator selects its tools for the execution architecture. Selecting 3.15
 automatically creates the 3.14 repository for this internal dependency; it
 does not need a separate `use_repo` entry.

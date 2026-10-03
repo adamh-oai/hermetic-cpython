@@ -13,5 +13,5 @@ exports_files([
 
 headers_directory(
     name = "builtin_resource_dir",
-    path = "lib/clang/21",
+    path = "lib/clang/22",
 )

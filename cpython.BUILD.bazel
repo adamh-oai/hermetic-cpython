@@ -22,6 +22,7 @@ load("@rules_cc//cc:cc_import.bzl", "cc_import")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:cc_shared_library.bzl", "cc_shared_library")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//bazel:module_sources.bzl", "CPYTHON_MODULE_SOURCES")
 load("//bazel:release.bzl", "CPYTHON_RELEASE", "PYTHON_NEEDS_DEEPFREEZE", "PYTHON_RESOURCE_FIELD3", "PYTHON_SOABI", "PYTHON_VERSION")
 
@@ -538,9 +539,9 @@ cc_library(
     }.items()
 ]
 
-# The generator uses a host CPython 3.14 and LLVM 21 to compile stencils for
+# The generator uses a host CPython 3.14 and LLVM 22 to compile stencils for
 # the target platform. Its libc and kernel headers match the C toolchain;
-# its Clang resource headers come from the same LLVM 21 distribution.
+# its Clang resource headers come from the same LLVM 22 distribution.
 genrule(
     name = "cpython_jit_stencils",
     srcs = glob([
@@ -587,6 +588,26 @@ genrule(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
 )
+
+[
+    sh_test(
+        name = "cpython_jit_test",
+        srcs = ["@cpython//python/private:cpython_jit_test.sh"],
+        args = ["$(rlocationpath :python)"],
+        data = [
+            ":python",
+            "@bazel_tools//tools/bash/runfiles",
+        ],
+        target_compatible_with = select({
+            ":cpython_linux_arm64_jit_disabled": ["@platforms//:incompatible"],
+            ":cpython_linux_x86_64_jit_disabled": ["@platforms//:incompatible"],
+            ":linux_arm64": [],
+            ":linux_x86_64": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
+    for _ in ([True] if PYTHON_VERSION == "3.15" else [])
+]
 
 CORE_BASE_SOURCES = glob([
     "Objects/*.c",

@@ -8,11 +8,11 @@ _BUILD_FILE = Label("//:cpython.BUILD.bazel")
 _LIBFFI_BUILD_FILE = Label("//:libffi.BUILD.bazel")
 _JIT_LLVM_BUILD_FILE = Label("//python/private:jit_llvm.BUILD.bazel")
 
-# CPython 3.15's JIT generator requires LLVM 21. These are host tools for
+# CPython 3.15's JIT generator uses LLVM 22. These are host tools for
 # generating stencils, independent of the LLVM toolchain that builds Python.
 _JIT_LLVM_ARCHIVES = {
-    "linux_amd64": "76ea940cfe14859b78e6175ebae9176a92f3b4e3a5a5e3f4488d2a0853f01cd0",
-    "linux_arm64": "ac70f0b0f448e7d6e36784877f8df533beb91e7ea7a61fc724e09a962adfb101",
+    "linux_amd64": "379f4a009e873c7dc0a9ef2593dab44d3da48ee5c4f05db1382f8cd18779d26d",
+    "linux_arm64": "9ddfbca0cd3fdb90b5c8d6bd35729d4769aca39659892ad5e1b1fb83dd272634",
 }
 
 def _python_impl(module_ctx):
@@ -48,7 +48,7 @@ def _python_impl(module_ctx):
                 name = "cpython_jit_llvm_" + platform,
                 build_file = _JIT_LLVM_BUILD_FILE,
                 sha256 = sha256,
-                urls = ["https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-21.1.8-10/llvm-toolchain-minimal-21.1.8-{}-musl.tar.zst".format(platform.replace("_", "-"))],
+                urls = ["https://github.com/hermeticbuild/hermetic-llvm/releases/download/llvm-22.1.4-1/llvm-toolchain-minimal-22.1.4-{}-musl.tar.zst".format(platform.replace("_", "-"))],
             )
 
         http_archive(
