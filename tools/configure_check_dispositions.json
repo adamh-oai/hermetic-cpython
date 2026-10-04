@@ -201,6 +201,11 @@
         "3.14:darwin_arm64": "1"
       }
     },
+    "Py_ENABLE_SHARED": {
+      "classification": "FIXED_BUILD_POLICY",
+      "justification": "The POSIX runtime uses a shared libpython on all supported targets.",
+      "expected_values": {"*:*": "1"}
+    },
     "Py_HASH_ALGORITHM": {
       "classification": "INTENTIONALLY_UNDEFINED",
       "justification": "pyhash.h supplies CPython's default value when no configure option is selected.",
@@ -566,8 +571,8 @@
     {
       "name": "unsupported_build_modes",
       "classification": "UNSUPPORTED_BUILD_MODE",
-      "implementation": "debug, shared-libpython, free-threading, statistics, trace-refs, DTrace, Valgrind, framework, universal, and perf-trampoline symbols have explicit undefined dispositions.",
-      "justification": "The version tag selects an ordinary static CPython build."
+      "implementation": "debug, free-threading, statistics, trace-refs, DTrace, Valgrind, framework, universal, and perf-trampoline symbols have explicit undefined dispositions.",
+      "justification": "The version tag selects an ordinary shared-libpython CPython build."
     },
     {
       "name": "hash_algorithm_default",
@@ -648,7 +653,6 @@
       "ALT_SOABI",
       "PY_HAVE_PERF_TRAMPOLINE",
       "Py_DEBUG",
-      "Py_ENABLE_SHARED",
       "Py_GIL_DISABLED",
       "Py_STATS",
       "Py_TRACE_REFS",
