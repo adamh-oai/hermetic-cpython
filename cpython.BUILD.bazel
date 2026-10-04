@@ -542,52 +542,55 @@ cc_library(
 # The generator uses a host CPython 3.14 and LLVM 22 to compile stencils for
 # the target platform. Its libc and kernel headers match the C toolchain;
 # its Clang resource headers come from the same LLVM 22 distribution.
-genrule(
-    name = "cpython_jit_stencils",
-    srcs = glob([
-        "Include/**",
-        "Python/**/*.h",
-        "Python/**/*.inc",
-        "Tools/jit/**",
-    ], allow_empty = True) + [
-        ":pyconfig_h",
-        "//bazel:jit_extra_headers.json",
-        "@cpython//python/private:cpython_jit.py",
-        "@llvm//runtimes/glibc:glibc_headers_include_search_directory",
-        "@llvm//tools:cpython_jit_kernel_headers",
-    ],
-    tools = [
-        ":cpython_jit_llvm_clang",
-        ":cpython_jit_llvm_multicall",
-        ":cpython_jit_llvm_objdump",
-        ":cpython_jit_llvm_readobj",
-        ":cpython_jit_llvm_resource_dir",
-        "@python3_14//:python",
-    ],
-    outs = [
-        "cpython_jit/jit_stencils.h",
-        "cpython_jit/jit_stencils_target.h",
-    ],
-    cmd = """        $(location @python3_14//:python) $(location @cpython//python/private:cpython_jit.py) \
-            --script $(location Tools/jit/build.py) \
-            --output $(@D)/cpython_jit \
-            --pyconfig $(location :pyconfig_h) \
-            --tools $$(dirname $(location :cpython_jit_llvm_clang)) \
-            --glibc $(location @llvm//runtimes/glibc:glibc_headers_include_search_directory) \
-            --kernel $(location @llvm//tools:cpython_jit_kernel_headers) \
-            --resource $(location :cpython_jit_llvm_resource_dir) \
-            --extra-headers $(location //bazel:jit_extra_headers.json) \
-            --target """ + select({
-        ":linux_arm64": "aarch64-unknown-linux-gnu",
-        ":linux_x86_64": "x86_64-unknown-linux-gnu",
-        "//conditions:default": "unsupported-target",
-    }),
-    target_compatible_with = select({
-        ":linux_arm64": [],
-        ":linux_x86_64": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-)
+[
+    genrule(
+        name = "cpython_jit_stencils",
+        srcs = glob([
+            "Include/**",
+            "Python/**/*.h",
+            "Python/**/*.inc",
+            "Tools/jit/**",
+        ], allow_empty = True) + [
+            ":pyconfig_h",
+            "//bazel:jit_extra_headers.json",
+            "@cpython//python/private:cpython_jit.py",
+            "@llvm//runtimes/glibc:glibc_headers_include_search_directory",
+            "@kernel_headers//:kernel_headers_directory",
+        ],
+        tools = [
+            ":cpython_jit_llvm_clang",
+            ":cpython_jit_llvm_multicall",
+            ":cpython_jit_llvm_objdump",
+            ":cpython_jit_llvm_readobj",
+            ":cpython_jit_llvm_resource_dir",
+            "@python3_14//:python",
+        ],
+        outs = [
+            "cpython_jit/jit_stencils.h",
+            "cpython_jit/jit_stencils_target.h",
+        ],
+        cmd = """        $(location @python3_14//:python) $(location @cpython//python/private:cpython_jit.py) \
+                --script $(location Tools/jit/build.py) \
+                --output $(@D)/cpython_jit \
+                --pyconfig $(location :pyconfig_h) \
+                --tools $$(dirname $(location :cpython_jit_llvm_clang)) \
+                --glibc $(location @llvm//runtimes/glibc:glibc_headers_include_search_directory) \
+                --kernel $(location @kernel_headers//:kernel_headers_directory) \
+                --resource $(location :cpython_jit_llvm_resource_dir) \
+                --extra-headers $(location //bazel:jit_extra_headers.json) \
+                --target """ + select({
+            ":linux_arm64": "aarch64-unknown-linux-gnu",
+            ":linux_x86_64": "x86_64-unknown-linux-gnu",
+            "//conditions:default": "unsupported-target",
+        }),
+        target_compatible_with = select({
+            ":linux_arm64": [],
+            ":linux_x86_64": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
+    for _ in ([True] if PYTHON_VERSION == "3.15" else [])
+]
 
 [
     sh_test(
