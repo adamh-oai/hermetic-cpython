@@ -1,5 +1,6 @@
 exports_files([
     "cpython.BUILD.bazel",
+    "zstd.BUILD.bazel",
 ])
 
 platform(

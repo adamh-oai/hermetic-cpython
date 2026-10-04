@@ -41,6 +41,7 @@ readonly python
 
 exec "$python" -I -S -c '
 import json
+import hashlib
 import importlib.util
 import os
 import pathlib
@@ -87,6 +88,10 @@ if os.name == "nt":
     assert sys.winver.startswith(version), sys.winver
     assert os.path.samefile(pathlib.Path(_ctypes.__file__).parent, root / "DLLs")
     assert (root / "LICENSE.txt").is_file()
+    if version in ("3.14", "3.15"):
+        # The pinned Zstd license and source notices are appended byte-for-byte.
+        notices = (root / "LICENSE.txt").read_bytes()[-3603:]
+        assert hashlib.sha256(notices).hexdigest() == "c5dc5e8856540fae69c399c8377a935ed8aa4245a5c4d7e9fc6ee518c9702b61"
     dll_basename = "python" + version.replace(".", "")
     assert (root / f"{dll_basename}.dll").is_file()
     assert (root / "python3.dll").is_file()
@@ -103,6 +108,9 @@ else:
         assert _asyncio.__file__.endswith(sysconfig.get_config_var("EXT_SUFFIX"))
     assert not pathlib.Path(sysconfig.get_makefile_filename()).exists()
     assert (stdlib / "LICENSE.txt").is_file()
+    if version in ("3.14", "3.15"):
+        notice = (stdlib / "zstd-LICENSE.txt").read_bytes()
+        assert hashlib.sha256(notice).hexdigest() == "c5dc5e8856540fae69c399c8377a935ed8aa4245a5c4d7e9fc6ee518c9702b61"
     if version == "3.14":
         build_details = stdlib / "build-details.json"
         assert build_details.is_file()
@@ -116,6 +124,15 @@ else:
         assert details["abi"]["stable_abi_suffix"] == ".abi3.so"
         assert details["c_api"]["headers"] == f"./include/python{version}"
 
+if version in ("3.14", "3.15"):
+    from compression import zstd
+
+    payload = b"installed Python zstd roundtrip" * 1000
+    assert zstd.decompress(zstd.compress(payload)) == payload
+    if version == "3.15":
+        import _remote_debugging
+
+        assert _remote_debugging.zstd_available()
 assert ssl.OPENSSL_VERSION
 assert sqlite3.sqlite_version
 subprocess.run([sys.executable, "-I", "-S", "-c", "import encodings"], check=True)

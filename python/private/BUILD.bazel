@@ -40,6 +40,12 @@ cc_binary(
 )
 
 cc_binary(
+    name = "extract_c_license",
+    srcs = ["extract_c_license.c"],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
     name = "install_only_mtree",
     srcs = ["install_only_mtree.c"],
     features = select({

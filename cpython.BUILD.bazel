@@ -1614,6 +1614,48 @@ alias(
     actual = ":runtime/python",
 )
 
+# Preserve the third-party copyright notices along with Zstandard's own license.
+# These files come from the same checksum-pinned source used for the build.
+ZSTD_NOTICE_SOURCES = [
+    ("divsufsort", "lib/dictBuilder/divsufsort.c"),
+    ("threading", "lib/common/threading.c"),
+    ("xxhash", "lib/common/xxhash.c"),
+]
+
+[
+    run_binary(
+        name = "zstd_" + name + "_license",
+        srcs = ["@cpython_zstd//:" + path],
+        outs = ["zstd-notices/" + name + ".txt"],
+        args = [
+            "$(execpath @cpython_zstd//:{})".format(path),
+            "$(execpath zstd-notices/{}.txt)".format(name),
+        ],
+        tool = "@cpython//python/private:extract_c_license",
+    )
+    for name, path in ZSTD_NOTICE_SOURCES
+    if PYTHON_VERSION in ["3.14", "3.15"]
+]
+
+ZSTD_LICENSE_INPUTS = ["@cpython_zstd//:LICENSE"] + [
+    ":zstd_" + name + "_license"
+    for name, _ in ZSTD_NOTICE_SOURCES
+]
+
+[
+    run_binary(
+        name = "zstd_license",
+        srcs = ZSTD_LICENSE_INPUTS,
+        outs = ["zstd-LICENSE.txt"],
+        args = ["$(execpath zstd-LICENSE.txt)"] + [
+            "$(execpath {})".format(license_file)
+            for license_file in ZSTD_LICENSE_INPUTS
+        ],
+        tool = "@cpython//python/private:concat_files",
+    )
+    for _ in ([True] if PYTHON_VERSION in ["3.14", "3.15"] else [])
+]
+
 WINDOWS_LICENSE_INPUTS = [
     "LICENSE",
     "PC/crtlicense.txt",
@@ -1622,6 +1664,16 @@ WINDOWS_LICENSE_INPUTS = [
     "@openssl//:LICENSE.txt",
     "@xz//:COPYING",
     "@zlib//:LICENSE",
+] + ([":zstd_license"] if PYTHON_VERSION in ["3.14", "3.15"] else [])
+
+[
+    copy_file(
+        name = "install_posix_zstd_license",
+        src = ":zstd_license",
+        out = "install_metadata/posix/zstd-LICENSE.txt",
+        target_compatible_with = POSIX_TARGET_COMPATIBILITY,
+    )
+    for _ in ([True] if PYTHON_VERSION in ["3.14", "3.15"] else [])
 ]
 
 run_binary(
@@ -1640,6 +1692,7 @@ cpython_install_tree(
     version = PYTHON_VERSION,
     extensions = SHARED_EXTENSIONS,
     install_metadata = BUILD_METADATA.install_data,
+    posix_extra_licenses = [":install_posix_zstd_license"] if PYTHON_VERSION in ["3.14", "3.15"] else [],
     windows_venv_launchers = [
         ":runtime_stdlib_inputs/venv/scripts/nt/" + VENV_LAUNCHER_RUNTIME_NAME,
         ":runtime_stdlib_inputs/venv/scripts/nt/" + VENVW_LAUNCHER_RUNTIME_NAME,

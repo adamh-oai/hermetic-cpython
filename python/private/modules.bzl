@@ -173,7 +173,7 @@ _STDLIB_3_14 = [
     _module("_interpreters", "stdlib"),
     _module("_interpchannels", "stdlib"),
     _module("_interpqueues", "stdlib"),
-    _module("_remote_debugging", "stdlib"),
+    _module("_zstd", "stdlib", deps = ["@cpython_zstd//:zstd"]),
 ]
 
 _BUNDLED_BASE = [
@@ -371,6 +371,16 @@ def _bootstrap_modules(version):
         ]
     return modules + _BOOTSTRAP_SUFFIX
 
+def _remote_debugging_module(version):
+    if version == "3.15":
+        return _module(
+            "_remote_debugging",
+            "stdlib",
+            copts = ["-DHAVE_ZSTD"],
+            deps = ["@cpython_zstd//:zstd"],
+        )
+    return _module("_remote_debugging", "stdlib")
+
 def _version_modules(version):
     if version == "3.11":
         return (
@@ -415,6 +425,7 @@ def _version_modules(version):
             _bootstrap_modules(version) +
             _STDLIB_COMMON +
             _STDLIB_3_14 +
+            [_remote_debugging_module(version)] +
             ([_module("_math_integer", "stdlib")] if version == "3.15" else []) +
             _BUNDLED_BASE +
             _BUNDLED_3_14 +

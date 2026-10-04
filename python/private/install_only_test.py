@@ -84,6 +84,15 @@ if os.name == "nt":
     assert sys.winver.startswith(version), sys.winver
 for name in ("_testbuffer", "_testinternalcapi", "_xxtestfuzz"):
     assert importlib.util.find_spec(name) is None, name
+if sys.version_info[:2] >= (3, 14):
+    from compression import zstd
+
+    payload = b"relocated Python zstd roundtrip" * 1000
+    assert zstd.decompress(zstd.compress(payload)) == payload
+    if sys.version_info[:2] == (3, 15):
+        import _remote_debugging
+
+        assert _remote_debugging.zstd_available()
 assert ssl.OPENSSL_VERSION
 assert sqlite3.sqlite_version
 subprocess.run([sys.executable, "-I", "-S", "-c", "import encodings"], check=True)

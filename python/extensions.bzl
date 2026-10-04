@@ -6,6 +6,7 @@ load("//python/private:versions.bzl", "CPYTHON_RELEASES")
 
 _BUILD_FILE = Label("//:cpython.BUILD.bazel")
 _LIBFFI_BUILD_FILE = Label("//:libffi.BUILD.bazel")
+_ZSTD_BUILD_FILE = Label("//:zstd.BUILD.bazel")
 _JIT_LLVM_BUILD_FILE = Label("//python/private:jit_llvm.BUILD.bazel")
 
 # CPython 3.15's JIT generator uses LLVM 22. These are host tools for
@@ -81,6 +82,16 @@ def _python_impl(module_ctx):
             ],
             strip_prefix = "libffi-3.4.7",
             urls = ["https://github.com/libffi/libffi/releases/download/v3.4.7/libffi-3.4.7.tar.gz"],
+        )
+
+        # Keep the Zstandard source and notices independent of the consumer's
+        # selected module versions and repository overrides.
+        http_archive(
+            name = "cpython_zstd",
+            build_file = _ZSTD_BUILD_FILE,
+            integrity = "sha256-6zPlH0mhXgI5UM14Jcp0pKK0Pbg1SCWsJPwbfuCeb6M=",
+            strip_prefix = "zstd-1.5.7",
+            urls = ["https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"],
         )
 
     for version in sorted(requested_versions.keys()):

@@ -108,6 +108,16 @@
       "justification": "tzset behavior is fixed for the supported glibc and Darwin runtimes; rules_cc_autoconf cannot execute the upstream runtime test.",
       "expected_values": {"*:*": "1"}
     },
+    "HAVE_ZDICT_H": {
+      "classification": "DEPENDENCY_CONTRACT",
+      "justification": "The checksum-pinned Zstandard source archive supplies this header to _zstd on Python 3.14 and newer; pyconfig.h follows the pkg-config path, which leaves HAVE_ZDICT_H undefined.",
+      "expected_values": {"*:*": null}
+    },
+    "HAVE_ZSTD_H": {
+      "classification": "DEPENDENCY_CONTRACT",
+      "justification": "The checksum-pinned Zstandard source archive supplies this header to _zstd on Python 3.14 and newer and _remote_debugging on Python 3.15; pyconfig.h follows the pkg-config path, which leaves HAVE_ZSTD_H undefined.",
+      "expected_values": {"*:*": null}
+    },
     "HAVE_ZLIB_COPY": {
       "classification": "DEPENDENCY_CONTRACT",
       "justification": "The zlib module depends on the pinned zlib Bazel module.",
@@ -563,9 +573,15 @@
       "justification": "PY_SQLITE_HAVE_SERIALIZE follows the pinned SQLite build; extension loading remains disabled."
     },
     {
+      "name": "zstd_dependency",
+      "classification": "DEPENDENCY_CONTRACT",
+      "implementation": "CPython 3.14 and 3.15 _zstd and CPython 3.15 _remote_debugging depend on the checksum-pinned Zstandard source archive.",
+      "justification": "Headers and library are declared build inputs; pyconfig.h follows the upstream pkg-config path and leaves HAVE_ZSTD_H and HAVE_ZDICT_H undefined."
+    },
+    {
       "name": "unsupported_optional_dependencies",
       "classification": "UNSUPPORTED_DEPENDENCY",
-      "implementation": "readline, curses, panel, gdbm, ndbm, uuid, Tcl/Tk, editline, crypt, zstd, and external libintl symbols have explicit undefined dispositions.",
+      "implementation": "readline, curses, panel, gdbm, ndbm, uuid, Tcl/Tk, editline, crypt, and external libintl symbols have explicit undefined dispositions.",
       "justification": "The Bazel module does not declare those optional dependency graphs or modules."
     },
     {
@@ -715,8 +731,6 @@
       "HAVE_UUID_GENERATE_TIME_SAFE_STABLE_MAC",
       "HAVE_UUID_H",
       "HAVE_UUID_UUID_H",
-      "HAVE_ZDICT_H",
-      "HAVE_ZSTD_H",
       "MVWDELCH_IS_EXPRESSION",
       "Py_RL_STARTUP_HOOK_TAKES_ARGS",
       "WINDOW_HAS_FLAGS",
