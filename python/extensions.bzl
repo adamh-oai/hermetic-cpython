@@ -18,6 +18,7 @@ _JIT_LLVM_ARCHIVES = {
 def _python_impl(module_ctx):
     requested_versions = {}
     root_requested_versions = {}
+    sources = {}
 
     for module in module_ctx.modules:
         for version_tag in module.tags.version:
@@ -33,6 +34,24 @@ def _python_impl(module_ctx):
             requested_versions[version] = True
             if module.is_root:
                 root_requested_versions[version] = True
+
+        for source_tag in module.tags.source:
+            if not module.is_root:
+                fail("Only the root module may select a CPython source archive")
+            if source_tag.version != "3.15":
+                fail("Custom source archives are currently supported only for CPython 3.15")
+            if source_tag.version in sources:
+                fail("CPython {} has more than one source archive".format(source_tag.version))
+            if not source_tag.urls or len(source_tag.sha256) != 64 or any([
+                c not in "0123456789abcdef"
+                for c in source_tag.sha256.elems()
+            ]):
+                fail("A custom CPython source requires URLs and a lowercase SHA-256")
+            sources[source_tag.version] = source_tag
+
+    for version in sources:
+        if version not in root_requested_versions:
+            fail("A CPython source archive must have a matching root version tag")
 
     # CPython 3.15's JIT stencil generator runs with a separate host Python.
     # Make that interpreter available even when consumers only request 3.15.
@@ -67,6 +86,7 @@ def _python_impl(module_ctx):
     for version in sorted(requested_versions.keys()):
         release = CPYTHON_RELEASES[version]
         repository_name = release.repository_name
+        source = sources.get(version)
         cpython_source_repository(
             name = repository_name,
             build_file = _BUILD_FILE,
@@ -83,16 +103,20 @@ def _python_impl(module_ctx):
             release_level = release.release_level,
             resource_field3 = release.resource_field3,
             serial = release.serial,
-            sha256 = release.sha256,
+            sha256 = source.sha256 if source else release.sha256,
             soabi = release.soabi,
-            strip_prefix = release.strip_prefix,
+            strip_prefix = source.strip_prefix if source else release.strip_prefix,
             supports_isolated_interpreters = release.supports_isolated_interpreters or False,
-            urls = release.urls,
+            urls = source.urls if source else release.urls,
             venv_launcher_kind = release.venv_launcher_kind,
             venv_launcher_runtime_name = release.venv_launcher_runtime_name,
             venv_launcher_source = release.venv_launcher_source,
             venvw_launcher_runtime_name = release.venvw_launcher_runtime_name,
             windows_pyconfig_template = release.windows_pyconfig_template,
+            pinned_source = source != None,
+            extra_frozen_modules_json = source.extra_frozen_modules_json if source else "{}",
+            jit_extra_headers = source.jit_extra_headers if source else [],
+            module_copts_json = source.module_copts_json if source else "{}",
         )
 
     root_direct_deps = [
@@ -117,9 +141,23 @@ _version = tag_class(
     doc = "Selects a supported Python minor version.",
 )
 
+_source = tag_class(
+    attrs = {
+        "version": attr.string(mandatory = True),
+        "urls": attr.string_list(mandatory = True),
+        "sha256": attr.string(mandatory = True),
+        "strip_prefix": attr.string(),
+        "extra_frozen_modules_json": attr.string(default = "{}"),
+        "jit_extra_headers": attr.string_list(),
+        "module_copts_json": attr.string(default = "{}"),
+    },
+    doc = "Selects a checksum-pinned source archive and its additional build inputs.",
+)
+
 python = module_extension(
     implementation = _python_impl,
     tag_classes = {
+        "source": _source,
         "version": _version,
     },
 )

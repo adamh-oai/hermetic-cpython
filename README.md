@@ -68,6 +68,28 @@ The archive must have the CPython source files at its root. The build checks
 the source's major and minor version and derives its full release metadata
 from `Include/patchlevel.h`.
 
+A consuming root module can instead select a checksum-pinned source archive:
+
+```starlark
+python = use_extension("@cpython//python:extensions.bzl", "python")
+python.version(version = "3.15")
+python.source(
+    version = "3.15",
+    urls = ["https://example.com/python-source.tar.gz"],
+    sha256 = "<64 lowercase hexadecimal characters>",
+    strip_prefix = "python-source",
+)
+use_repo(python, "python3_15")
+```
+
+The `source` tag may also set `extra_frozen_modules_json`,
+`jit_extra_headers`, and `module_copts_json` using the formats described
+below. Its settings take precedence over the corresponding `--repo_env`
+options. `CPYTHON_3_15_SOURCE_ARCHIVE` can still select a local snapshot for
+development; in that case the `source` tag's build settings still apply.
+Only the root module may select a source archive, and it must also request
+the matching Python version.
+
 Custom source trees can request additional frozen modules using
 `--repo_env=CPYTHON_3_15_EXTRA_FROZEN_MODULES=<json>`, where the JSON object maps
 an output path under `Python/frozen_modules/` to a two-element array of the

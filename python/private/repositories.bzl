@@ -418,7 +418,11 @@ def _cpython_source_repository_impl(repository_ctx):
     repository_ctx.file("pybuilddir.txt", ".")
     extra_frozen = {}
     if repository_ctx.attr.minor_version == "3.15":
-        extra_frozen = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_EXTRA_FROZEN_MODULES", "{}"))
+        raw_frozen = (
+            repository_ctx.attr.extra_frozen_modules_json if repository_ctx.attr.pinned_source else
+            repository_ctx.os.environ.get("CPYTHON_3_15_EXTRA_FROZEN_MODULES", "{}")
+        )
+        extra_frozen = json.decode(raw_frozen)
         if type(extra_frozen) != "dict":
             fail("CPYTHON_3_15_EXTRA_FROZEN_MODULES must be a JSON object")
         for output, recipe in extra_frozen.items():
@@ -430,8 +434,15 @@ def _cpython_source_repository_impl(repository_ctx):
     extra_headers = []
     extra_copts = {}
     if repository_ctx.attr.minor_version == "3.15":
-        extra_headers = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_JIT_EXTRA_HEADERS", "[]"))
-        extra_copts = json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_MODULE_COPTS", "{}"))
+        extra_headers = (
+            repository_ctx.attr.jit_extra_headers if repository_ctx.attr.pinned_source else
+            json.decode(repository_ctx.os.environ.get("CPYTHON_3_15_JIT_EXTRA_HEADERS", "[]"))
+        )
+        raw_copts = (
+            repository_ctx.attr.module_copts_json if repository_ctx.attr.pinned_source else
+            repository_ctx.os.environ.get("CPYTHON_3_15_MODULE_COPTS", "{}")
+        )
+        extra_copts = json.decode(raw_copts)
         if type(extra_headers) != "list" or any([type(header) != "string" for header in extra_headers]):
             fail("CPYTHON_3_15_JIT_EXTRA_HEADERS must be a JSON array of strings")
         if type(extra_copts) != "dict":
@@ -528,6 +539,10 @@ cpython_source_repository = repository_rule(
         "CPYTHON_3_15_MODULE_COPTS",
     ],
     attrs = {
+        "extra_frozen_modules_json": attr.string(default = "{}"),
+        "jit_extra_headers": attr.string_list(),
+        "module_copts_json": attr.string(default = "{}"),
+        "pinned_source": attr.bool(),
         "build_details_schema": attr.string(),
         "build_file": attr.label(
             allow_single_file = True,
