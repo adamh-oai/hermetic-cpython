@@ -137,9 +137,16 @@ runtime, and the hermetic Windows SDK supplied by `windows_support`.
 ## Integration fixture
 
 [`tests/integration`](tests/integration) is a nested Bzlmod consumer. It selects
-all four supported minor versions and defines smoke tests for the reported
-Python version, standard-library and encoding imports, compiled-module imports,
-and starting a child interpreter with `subprocess`.
+Python 3.11 through 3.15 and defines smoke tests for the reported Python version,
+standard-library and encoding imports, compiled-module imports, starting a
+child interpreter with `subprocess`, and Zstandard on Python 3.14 and 3.15.
+
+The fixture has its own root module, so it repeats the fork's dependency
+overrides; keep those declarations in sync when updating the fork's root
+`MODULE.bazel`. The fixture reuses the canonical patch files through its
+`patches` directory symlink to `../../python/patches`. Its checkout must
+preserve symlinks; on Windows this requires Git symlink support and the
+necessary operating-system permissions when the repository is checked out.
 
 ## Configure check audit
 

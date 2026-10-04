@@ -66,6 +66,27 @@ assert (_testsinglephase.__spec__.origin or "").endswith(".so")
 assert (xxlimited.__spec__.origin or "").endswith(".so")
 '
     ;;
+  zstd)
+    exec "$python" -I -c '
+from compression import zstd
+import io
+import sys
+
+assert sys.version_info[:2] == tuple(map(int, sys.argv[1].split(".")))
+payload = (b"a repeated payload for compression\x00" * 4096) + bytes(range(256))
+compressed = zstd.compress(payload)
+assert compressed != payload
+assert zstd.decompress(compressed) == payload
+buffer = io.BytesIO()
+with zstd.ZstdFile(buffer, "wb") as target:
+    target.write(payload)
+with zstd.ZstdFile(io.BytesIO(buffer.getvalue()), "rb") as source:
+    assert source.read() == payload
+if sys.version_info[:2] == (3, 15):
+    import _remote_debugging
+    assert _remote_debugging.zstd_available()
+' "$expected_version"
+    ;;
   subprocess)
     exec "$python" -I -c '
 import subprocess

@@ -4,6 +4,7 @@ module(
 )
 
 bazel_dep(name = "cpython", version = "0.0.0")
+bazel_dep(name = "llvm", version = "0.8.8")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
 local_path_override(
@@ -11,7 +12,76 @@ local_path_override(
     path = "../..",
 )
 
+# Overrides apply only in the root module. Reuse the fork's canonical patch
+# files through tests/integration/patches and keep these declarations aligned
+# with the fork's MODULE.bazel.
+single_version_override(
+    module_name = "bzip2",
+    patch_strip = 1,
+    patches = ["//patches/bzip2:export-license.patch"],
+    version = "1.0.8.bcr.4",
+)
+
+single_version_override(
+    module_name = "openssl",
+    patch_strip = 1,
+    patches = [
+        "//patches/openssl:export-license.patch",
+        "//patches/openssl:windows-defines.patch",
+    ],
+    version = "3.5.5.bcr.4",
+)
+
+single_version_override(
+    module_name = "windows_support",
+    patch_strip = 1,
+    patches = ["//patches/windows_support:expose-vcruntime-dlls.patch"],
+    version = "0.2.0",
+)
+
+single_version_override(
+    module_name = "xz",
+    patch_strip = 1,
+    patches = ["//patches/xz:export-license.patch"],
+    version = "5.4.5.bcr.8",
+)
+
+single_version_override(
+    module_name = "rules_cc_autoconf",
+    patch_strip = 1,
+    patches = [
+        "//patches/rules_cc_autoconf:expose-autoconf-header-manifest.patch",
+        "//patches/rules_cc_autoconf:windows-clang-cl-command-line.patch",
+        "//patches/rules_cc_autoconf:windows-clang-cl-exceptions.patch",
+        "//patches/rules_cc_autoconf:windows-msvc-driver-link-flags.patch",
+        "//patches/rules_cc_autoconf:windows-native-command-paths.patch",
+    ],
+    version = "0.12.1",
+)
+
+archive_override(
+    module_name = "llvm",
+    integrity = "sha256-sSr0NUsY06DQwPoxgh+drMpOkeG/N7Lx+KxWkZTFUDM=",
+    patch_strip = 1,
+    patches = [
+        "//patches/llvm:msvc-runtime-features.patch",
+        "//patches/llvm:msvc-warning-level.patch",
+        "//patches/llvm:jit-headers.patch",
+        "//patches/llvm:pgo.patch",
+    ],
+    strip_prefix = "hermetic-llvm-85d29dc776702879eb9cbcbe560428df7fd24e64",
+    urls = ["https://github.com/hermeticbuild/hermetic-llvm/archive/85d29dc776702879eb9cbcbe560428df7fd24e64.tar.gz"],
+)
+
+archive_override(
+    module_name = "rules_cc",
+    integrity = "sha256-yLVbuU8I/7wTSmCifWYUqY45Q5aMRqWZkkkX6uXaFio=",
+    strip_prefix = "rules_cc-cb995b18db7c855fe95cacf0a0e84fda8c58725d",
+    urls = ["https://github.com/ArchangelX360/rules_cc/archive/cb995b18db7c855fe95cacf0a0e84fda8c58725d.tar.gz"],
+)
+
 python = use_extension("@cpython//python:extensions.bzl", "python")
+python.version(version = "3.15")
 python.version(version = "3.14")
 python.version(version = "3.13")
 python.version(version = "3.12")
@@ -22,4 +92,5 @@ use_repo(
     "python3_12",
     "python3_13",
     "python3_14",
+    "python3_15",
 )

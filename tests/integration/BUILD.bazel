@@ -33,6 +33,26 @@ package(default_visibility = ["//visibility:public"])
     ]
 ]
 
+[
+    sh_test(
+        name = "python%s_zstd_test" % version.replace(".", "_"),
+        srcs = ["python_smoke_test.sh"],
+        args = [
+            "$(rlocationpath @python%s//:python)" % version.replace(".", "_"),
+            version,
+            "zstd",
+        ],
+        data = [
+            "@bazel_tools//tools/bash/runfiles",
+            "@python%s//:python" % version.replace(".", "_"),
+        ],
+    )
+    for version in [
+        "3.14",
+        "3.15",
+    ]
+]
+
 test_suite(
     name = "smoke_tests",
     tests = [
@@ -52,5 +72,7 @@ test_suite(
         ":python3_14_stdlib_test",
         ":python3_14_subprocess_test",
         ":python3_14_version_test",
+        ":python3_14_zstd_test",
+        ":python3_15_zstd_test",
     ],
 )

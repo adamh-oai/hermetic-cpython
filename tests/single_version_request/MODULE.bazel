@@ -1,0 +1,31 @@
+module(
+    name = "cpython_single_version_request",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "cpython", version = "0.0.0")
+bazel_dep(name = "llvm", version = "0.8.8")
+
+local_path_override(
+    module_name = "cpython",
+    path = "../..",
+)
+
+# Dependency overrides from cpython's root module are not inherited.
+archive_override(
+    module_name = "llvm",
+    integrity = "sha256-sSr0NUsY06DQwPoxgh+drMpOkeG/N7Lx+KxWkZTFUDM=",
+    strip_prefix = "hermetic-llvm-85d29dc776702879eb9cbcbe560428df7fd24e64",
+    urls = ["https://github.com/hermeticbuild/hermetic-llvm/archive/85d29dc776702879eb9cbcbe560428df7fd24e64.tar.gz"],
+)
+
+archive_override(
+    module_name = "rules_cc",
+    integrity = "sha256-yLVbuU8I/7wTSmCifWYUqY45Q5aMRqWZkkkX6uXaFio=",
+    strip_prefix = "rules_cc-cb995b18db7c855fe95cacf0a0e84fda8c58725d",
+    urls = ["https://github.com/ArchangelX360/rules_cc/archive/cb995b18db7c855fe95cacf0a0e84fda8c58725d.tar.gz"],
+)
+
+python = use_extension("@cpython//python:extensions.bzl", "python")
+python.version(version = "3.13")
+use_repo(python, "python3_13")
