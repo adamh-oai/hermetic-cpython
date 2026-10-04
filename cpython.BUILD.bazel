@@ -1742,3 +1742,8 @@ upstream_regrtests(
     test_data = [":source_build_test_data"],
     version = PYTHON_VERSION,
 )
+
+# Expose source inputs for downstream native extensions and regression tests.
+exports_files(["Objects/typeobject.c", "Lib/ntpath.py"])
+filegroup(name = "headers_and_objects", srcs = glob(["Include/**", "Objects/**"]))
+filegroup(name = "source_tree", srcs = glob(["**"]))
